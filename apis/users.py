@@ -11,29 +11,11 @@ from sqlalchemy import select, or_, func
 from bcrypt import hashpw
 
 from database import get_db
-
-from pydantic import BaseModel
+from schema import UserCreateResponseSchema, UserCreateRequestSchema, UserUpdateRequestSchema
 
 router = APIRouter(prefix="/users")
 per_page = 10
 salt = b'$2b$12$apcpayF3r/A/kKo2dlRk8O'
-
-
-class UserCreateRequestSchema(BaseModel):
-    email: str
-    password: str
-    password_confirm: str
-    name: str = None
-    employee_id: str = None
-    user_role_id: int = None
-
-
-class UserCreateResponseSchema(BaseModel):
-    id: int
-    email: str
-    name: str
-    employee_id: str | None
-    users_role_id: int | None
 
 
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponseSchema)
@@ -155,11 +137,6 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise GetException('there is no user', ExceptionType.NOT_FOUND)
     return user
-
-
-class UserUpdateRequestSchema(BaseModel):
-    name: str = None
-    employee_id: str = None
 
 
 @router.patch('/{user_id}')
