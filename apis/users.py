@@ -1,6 +1,7 @@
-import os
+import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status, HTTPException, Request
+from exceptions import GetException, ExceptionType
 from models.model import User
 
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +9,7 @@ from sqlalchemy import select, or_, func
 
 from database import get_db
 
+from pydantic import BaseModel
 router = APIRouter(prefix="/users")
 per_page = 10
 @router.get('', status_code=status.HTTP_200_OK)
@@ -102,20 +104,21 @@ class UserUpdateRequestSchema(BaseModel):
 @router.patch('/{user_id}')
 async def update_user(request: Request, user_id: int, user_data: UserUpdateRequestSchema,
                       db: Session = Depends(get_db)):
-    # token = request.headers.get('Authorization')
-    # try:
-    #     me = get_user_by_token(token, db)
-    #     # check user_id me id
-    #     if me.id != user_id:
-    #         check_user_permission(me)
-    #
-    # except GetException as e:
-    #     if e.exception_type == ExceptionType.INVALID_TOKEN:
-    #         logging.error(e.message)
-    #         raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
-    #     elif e.exception_type == ExceptionType.INVALID_PERMISSION:
-    #         logging.error(e.message)
-    #         raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+    token = request.headers.get('Authorization')
+    try:
+        me = get_user_by_token(token, db)
+        # check user_id me id
+        if me.id != user_id:
+            check_user_permission(me)
+
+    except GetException as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
+        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+
     result = dict()
     user = None
     try:
