@@ -69,3 +69,71 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
     #         }
     #     }
     # }
+
+
+def get_user_by_token(token: str, db: Session = Depends(get_db)):
+    if not token:
+        raise GetException('invalid token', ExceptionType.INVALID_TOKEN)
+    select_user = select(User).options(joinedload(User.users_role)).where(User.token == token)
+    user = db.scalar(select_user)
+    if not user:
+        raise GetException("invalid token", ExceptionType.NOT_FOUND)
+    return user
+
+
+def check_user_permission(user: User):
+    if user.users_role.role != 'administrator':
+        raise GetException('invalid token', ExceptionType.INVALID_PERMISSION)
+
+
+def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    # get update user data
+    user = db.query(User).get(user_id)
+    if not user:
+        raise GetException('there is no user', ExceptionType.NOT_FOUND)
+    return user
+
+
+class UserUpdateRequestSchema(BaseModel):
+    name: str = None
+    employee_id: str = None
+
+
+@router.patch('/{user_id}')
+async def update_user(request: Request, user_id: int, user_data: UserUpdateRequestSchema,
+                      db: Session = Depends(get_db)):
+    # token = request.headers.get('Authorization')
+    # try:
+    #     me = get_user_by_token(token, db)
+    #     # check user_id me id
+    #     if me.id != user_id:
+    #         check_user_permission(me)
+    #
+    # except GetException as e:
+    #     if e.exception_type == ExceptionType.INVALID_TOKEN:
+    #         logging.error(e.message)
+    #         raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
+    #     elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+    #         logging.error(e.message)
+    #         raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+    result = dict()
+    user = None
+    try:
+        user = get_user_by_id(user_id, db)
+        # update
+        if user_data.name:
+            user.name = user_data.name
+            result['name'] = user.name
+        if user_data.employee_id:
+            user.employee_id = user_data.employee_id
+            result['employee_id'] = user.employee_id
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    except GetException as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'there is no user')
+
+    return user
