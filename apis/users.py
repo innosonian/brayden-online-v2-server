@@ -1,17 +1,77 @@
 import logging
 
 from fastapi import APIRouter, Depends, status, HTTPException, Request
+
 from exceptions import GetException, ExceptionType
 from models.model import User
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, or_, func
 
+from bcrypt import hashpw
+
 from database import get_db
 
 from pydantic import BaseModel
+
 router = APIRouter(prefix="/users")
 per_page = 10
+salt = b'$2b$12$apcpayF3r/A/kKo2dlRk8O'
+
+
+class UserCreateRequestSchema(BaseModel):
+    email: str
+    password: str
+    password_confirm: str
+    name: str = None
+    employee_id: str = None
+    user_role_id: int = None
+
+
+class UserCreateResponseSchema(BaseModel):
+    id: int
+    email: str
+    name: str
+    employee_id: str | None
+    users_role_id: int | None
+
+
+@router.post('', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponseSchema)
+async def create_user(request: Request, user: UserCreateRequestSchema, db: Session = Depends(get_db)):
+    db.expire_on_commit = False
+    # check email duplicate
+    email_check_query = select(User).where(User.email == user.email)
+    check_user = db.execute(email_check_query).scalar()
+    if check_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email duplicate")
+
+    # get organization id by token
+    token = request.headers.get('Authorization')
+    organization_id = None
+    try:
+        me = get_user_by_token(token, db)
+        organization_id = me.organization_id
+    except GetException as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
+        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+
+    def hashed_password(password: str):
+        return hashpw(password.encode('utf-8'), salt)
+
+    password_hashed = hashed_password(user.password).decode('utf-8')
+    insert_user = User(email=user.email, name=user.name, password_hashed=password_hashed, employee_id=user.employee_id,
+                       users_role_id=user.user_role_id, organization_id=organization_id)
+    db.add(insert_user)
+    db.commit()
+    db.refresh(insert_user)
+
+    return insert_user
+
+
 @router.get('', status_code=status.HTTP_200_OK)
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     def get_users_by_search_keyword(search_keyword):
