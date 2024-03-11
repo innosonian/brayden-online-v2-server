@@ -1,1 +1,1 @@
-from .exception import GetException, ExceptionType
+from .exception import GetException, ExceptionType, GetExceptionWithStatuscode

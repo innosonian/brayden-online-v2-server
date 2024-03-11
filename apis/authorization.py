@@ -1,5 +1,8 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Depends, status
 
+from exceptions import ExceptionType, GetExceptionWithStatuscode
 from models import User
 from database import get_db
 from bcrypt import checkpw
@@ -34,20 +37,27 @@ def get_user_by_email(email, db: Session = Depends(get_db)):
 
 def validate_login_data(user, password):
     if not user:
-        raise HTTPException(
-            status_code=403, detail="not matched id or password")
+        raise GetExceptionWithStatuscode(status.HTTP_403_FORBIDDEN,
+                                         'not matched id or password',
+                                         ExceptionType.NOT_MATCHED)
 
     if not checkpw(password.encode('utf-8'), user.password_hashed.encode('utf-8')):
-        raise HTTPException(
-            status_code=403, detail="not matched id or password")
-
+        raise GetExceptionWithStatuscode(status.HTTP_403_FORBIDDEN,
+                                         'not matched id or password',
+                                         ExceptionType.NOT_MATCHED)
     return user
 
 
 @router.post('/login', status_code=status.HTTP_200_OK, response_model=LoginResponseSchema)
 async def login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
-    user_by_email = get_user_by_email(login_data.email, db)
-    user = validate_login_data(user_by_email, login_data.password)
+    try:
+        user_by_email = get_user_by_email(login_data.email, db)
+        user = validate_login_data(user_by_email, login_data.password)
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_MATCHED:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
+
     # insert token value
     token = uuid1().__str__()
     user.token = token
