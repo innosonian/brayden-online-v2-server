@@ -39,12 +39,6 @@ class UserCreateResponseSchema(BaseModel):
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponseSchema)
 async def create_user(request: Request, user: UserCreateRequestSchema, db: Session = Depends(get_db)):
     db.expire_on_commit = False
-    # check email duplicate
-    email_check_query = select(User).where(User.email == user.email)
-    check_user = db.execute(email_check_query).scalar()
-    if check_user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email duplicate")
-
     # get organization id by token
     token = request.headers.get('Authorization')
     organization_id = None
@@ -58,6 +52,13 @@ async def create_user(request: Request, user: UserCreateRequestSchema, db: Sessi
         elif e.exception_type == ExceptionType.INVALID_PERMISSION:
             logging.error(e.message)
             raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+
+    # check email duplicate
+    email_check_query = select(User).where(User.email == user.email)
+    check_user = db.execute(email_check_query).scalar()
+    if check_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email duplicate")
+
 
     def hashed_password(password: str):
         return hashpw(password.encode('utf-8'), salt)
