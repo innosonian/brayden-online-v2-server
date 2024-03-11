@@ -1,8 +1,9 @@
 import logging
 
-from fastapi import APIRouter, Depends, status, HTTPException, Request
+import regex
+from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile
 
-from exceptions import GetException, ExceptionType
+from exceptions import GetException, ExceptionType, GetExceptionWithStatuscode
 from models.model import User
 
 from sqlalchemy.orm import Session, joinedload
@@ -18,15 +19,27 @@ per_page = 10
 salt = b'$2b$12$apcpayF3r/A/kKo2dlRk8O'
 
 
+def get_token_by_header(headers):
+    if 'Authorization' not in headers:
+        raise GetExceptionWithStatuscode(status.HTTP_401_UNAUTHORIZED,
+                                         'there is no token',
+                                         ExceptionType.INVALID_TOKEN)
+    return headers.get('Authorization')
+
+
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponseSchema)
 async def create_user(request: Request, user: UserCreateRequestSchema, db: Session = Depends(get_db)):
     db.expire_on_commit = False
     # get organization id by token
-    token = request.headers.get('Authorization')
     organization_id = None
     try:
+        token = get_token_by_header(request.headers)
         me = get_user_by_token(token, db)
         organization_id = me.organization_id
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
     except GetException as e:
         if e.exception_type == ExceptionType.INVALID_TOKEN:
             logging.error(e.message)
@@ -34,13 +47,15 @@ async def create_user(request: Request, user: UserCreateRequestSchema, db: Sessi
         elif e.exception_type == ExceptionType.INVALID_PERMISSION:
             logging.error(e.message)
             raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, 'there is no user')
 
     # check email duplicate
     email_check_query = select(User).where(User.email == user.email)
     check_user = db.execute(email_check_query).scalar()
     if check_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email duplicate")
-
 
     def hashed_password(password: str):
         return hashpw(password.encode('utf-8'), salt)
@@ -144,11 +159,14 @@ async def update_user(request: Request, user_id: int, user_data: UserUpdateReque
                       db: Session = Depends(get_db)):
     token = request.headers.get('Authorization')
     try:
+        token = get_token_by_header(request.headers)
         me = get_user_by_token(token, db)
         # check user_id me id
         if me.id != user_id:
             check_user_permission(me)
-
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
     except GetException as e:
         if e.exception_type == ExceptionType.INVALID_TOKEN:
             logging.error(e.message)
