@@ -87,7 +87,7 @@ async def get_training_content(content_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete('/training-programs/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
-async def update_training_content(content_id: int, db: Session = Depends(get_db)):
+async def delete_training_content(content_id: int, db: Session = Depends(get_db)):
     try:
         training_content = check_exist_training_content(content_id, db)
         db.delete(training_content)
