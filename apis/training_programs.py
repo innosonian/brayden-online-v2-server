@@ -75,7 +75,7 @@ async def update_training_program(training_program_id: int, data: UpdateRequestS
     try:
         training_program = check_exist_training_program(training_program_id, db)
         training_data = dict()
-
+        #TODO 데이터 변환을 어떻게 하면 좋을지
         if data.compression_ventilation_ratio:
             cvr = data.compression_ventilation_ratio
             split_cvr = cvr.split(':')
