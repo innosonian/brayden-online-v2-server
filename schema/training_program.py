@@ -13,8 +13,8 @@ class CreateRequestSchema(BaseModel):
     compression_limit: int | None = None
     cycle_limit: int | None = None
     ventilation_limit: int | None = None
-    per_compression: int | None = None
-    per_ventilation: int | None = None
+    cvr_compression: int | None = None
+    cvr_ventilation: int | None = None
     organization_id: int
     cpr_guideline_id: int
 
@@ -48,7 +48,7 @@ class CreateResponseSchema(BaseModel):
     compression_limit: int | None = None
     cycle_limit: int | None = None
     ventilation_limit: int | None = None
-    per_compression: int | None = None
-    per_ventilation: int | None = None
+    cvr_compression: int | None = None
+    cvr_ventilation: int | None = None
     organization_id: int
     cpr_guideline_id: int

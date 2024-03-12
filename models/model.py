@@ -64,8 +64,8 @@ class TrainingProgram(Base):
     compression_limit = Column(Integer)
     cycle_limit = Column(Integer)
     ventilation_limit = Column(Integer)
-    per_compression = Column(Integer)
-    per_ventilation = Column(Integer)
+    cvr_compression = Column(Integer)
+    cvr_ventilation = Column(Integer)
     organization_id = Column(Integer, ForeignKey('organization.id'))
     cpr_guideline_id = Column(Integer, ForeignKey("cpr_guideline.id"))
 
