@@ -39,6 +39,7 @@ class Organization(Base):
     users = relationship('User', back_populates='organization')
     training_program = relationship('TrainingProgram', back_populates='organization')
     organization_content = relationship('OrganizationContent', back_populates='organization')
+    certifications_template = relationship('CertificationsTemplate', back_populates='organization')
 
 
 class CPRGuideline(Base):
@@ -160,3 +161,51 @@ class OrganizationContent(Base):
             file_name=self.file_name,
             url=self.presigned_url
         )
+
+
+class CertificationsTemplate(Base):
+    __tablename__ = 'certifications_template'
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100))
+    manikin_type = Column(String(50))
+    organization_name = Column(String(50))
+    images = Column(JSON)
+    organization_id = Column(Integer, ForeignKey('organization.id'))
+
+    organization = relationship('Organization', back_populates='certifications_templates')
+
+    @property
+    def presigned_url(self):
+        # TODO: DELETE THIS
+        def authorize_aws_s3():
+            import os
+            from boto3 import client
+            if os.environ.get('aws_access_key_id') and os.environ.get('aws_secret_access_key'):
+                access_key = os.environ.get('aws_access_key_id')
+                secret_access_key = os.environ.get('aws_secret_access_key')
+                s3 = client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_access_key)
+            else:
+                s3 = client('s3')
+            return s3
+
+        # TODO: DELETE THIS
+        BUCKET_NAME = 'brayden-online-v2-api-storage'
+
+        s3 = authorize_aws_s3()
+        images_url = dict()
+        for k in self.images.keys():
+            images_url[k] = None
+            if self.images[k]:
+                images_url[k] = s3.generate_presigned_url('get_object',
+                                                          Params={'Bucket': BUCKET_NAME,
+                                                                  'Key': self.images[k]},
+                                                          ExpiresIn=3600)
+        return images_url
+
+    @property
+    def convert_to_schema(self):
+        from schema.certifications_template import GetResponseSchema
+        images_url = self.presigned_url
+        return GetResponseSchema(id=self.id, title=self.title, organization=self.organization, images=images_url,
+                                 manikin_type=self.manikin_type)
