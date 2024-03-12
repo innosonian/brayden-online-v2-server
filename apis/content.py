@@ -2,11 +2,14 @@ import os
 from fastapi import APIRouter, status, Depends, UploadFile, HTTPException
 
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import select
+
 from datetime import datetime
 from database import get_db
 
 from boto3 import client
 
+from exceptions import GetExceptionWithStatuscode, ExceptionType
 from models.model import TrainingProgramContent
 from schema.content import CreateResponseSchema
 
@@ -48,7 +51,7 @@ def upload_file_to_s3(file: UploadFile):
     return False
 
 
-@router.post('/training-program', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+@router.post('/training-programs', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
 async def create_training_content(content: UploadFile, db: Session = Depends(get_db)):
     # upload file to s3
     s3_key = upload_file_to_s3(content)
@@ -61,18 +64,20 @@ async def create_training_content(content: UploadFile, db: Session = Depends(get
     db.commit()
     db.refresh(training_content)
 
-    return training_content.convert_to_schema()
+    return training_content.convert_to_schema
+
 
 def check_exist_training_content(content_id: int, db: Session = Depends(get_db)):
     query = select(TrainingProgramContent).where(TrainingProgramContent.id == content_id)
     training_content = db.execute(query).scalar()
-    if not training_content:
+    if training_content is None:
         raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
                                          message='there is no content',
                                          exception_type=ExceptionType.NOT_FOUND)
+    return training_content
 
 
-@router.get('/training-program/{content_id}', response_model=CreateResponseSchema)
+@router.get('/training-programs/{content_id}', response_model=CreateResponseSchema)
 async def get_training_content(content_id: int, db: Session = Depends(get_db)):
     try:
         training_content = check_exist_training_content(content_id, db)
@@ -80,3 +85,17 @@ async def get_training_content(content_id: int, db: Session = Depends(get_db)):
     except GetExceptionWithStatuscode as e:
         raise HTTPException(e.status_code, detail=e.message)
 
+
+@router.delete('/training-programs/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def update_training_content(content_id: int, db: Session = Depends(get_db)):
+    try:
+        training_content = check_exist_training_content(content_id, db)
+        db.delete(training_content)
+
+        # s3 delete
+        s3 = authorize_aws_s3()
+        ret = s3.delete_object(Bucket=BUCKET_NAME, Key=training_content.s3_key)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        raise HTTPException(e.status_code, detail=e.message)

@@ -106,7 +106,7 @@ class TrainingProgramContent(Base):
                                          Params={'Bucket': BUCKET_NAME,
                                                  'Key': self.s3_key},
                                          ExpiresIn=3600)
-
+    @property
     def convert_to_schema(self):
         from schema.content import CreateResponseSchema
         return CreateResponseSchema(
