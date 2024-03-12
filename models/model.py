@@ -37,6 +37,7 @@ class Organization(Base):
     organization_name = Column(String(200), unique=True)
 
     users = relationship('User', back_populates='organization')
+    training_program = relationship('TrainingProgram', back_populates='organization')
 
 
 class CPRGuideline(Base):
@@ -46,6 +47,8 @@ class CPRGuideline(Base):
     title = Column(String(100))
     compression_depth = Column(JSON)
     ventilation_volume = Column(JSON)
+
+    training_program = relationship('TrainingProgram', back_populates='cpr_guideline')
 
 
 class TrainingProgram(Base):
@@ -66,5 +69,5 @@ class TrainingProgram(Base):
     organization_id = Column(Integer, ForeignKey('organization.id'))
     cpr_guideline_id = Column(Integer, ForeignKey("cpr_guideline.id"))
 
-    cpr_guideline = relationship("CPRGuideline", back_populates="training_program")
-    organization = relationship("Organization", back_populates='training_program')
+    cpr_guideline = relationship('CPRGuideline', back_populates='training_program')
+    organization = relationship('Organization', back_populates='training_program')
