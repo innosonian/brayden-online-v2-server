@@ -46,3 +46,25 @@ class CPRGuideline(Base):
     title = Column(String(100))
     compression_depth = Column(JSON)
     ventilation_volume = Column(JSON)
+
+
+class TrainingProgram(Base):
+    __tablename__ = "training_program"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(50))
+    manikin_type = Column(String(50))
+    training_type = Column(String(50))
+    feedback_type = Column(String(50))
+    training_mode = Column(String(50))
+    duration = Column(Integer)
+    compression_limit = Column(Integer)
+    cycle_limit = Column(Integer)
+    ventilation_limit = Column(Integer)
+    per_compression = Column(Integer)
+    per_ventilation = Column(Integer)
+    organization_id = Column(Integer, ForeignKey('organization.id'))
+    cpr_guideline_id = Column(Integer, ForeignKey("cpr_guideline.id"))
+
+    cpr_guideline = relationship("CPRGuideline", back_populates="training_program")
+    organization = relationship("Organization", back_populates='training_program')
