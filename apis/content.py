@@ -62,3 +62,21 @@ async def create_training_content(content: UploadFile, db: Session = Depends(get
     db.refresh(training_content)
 
     return training_content.convert_to_schema()
+
+def check_exist_training_content(content_id: int, db: Session = Depends(get_db)):
+    query = select(TrainingProgramContent).where(TrainingProgramContent.id == content_id)
+    training_content = db.execute(query).scalar()
+    if not training_content:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='there is no content',
+                                         exception_type=ExceptionType.NOT_FOUND)
+
+
+@router.get('/training-program/{content_id}', response_model=CreateResponseSchema)
+async def get_training_content(content_id: int, db: Session = Depends(get_db)):
+    try:
+        training_content = check_exist_training_content(content_id, db)
+        return training_content.convert_to_schema
+    except GetExceptionWithStatuscode as e:
+        raise HTTPException(e.status_code, detail=e.message)
+
