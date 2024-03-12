@@ -42,6 +42,7 @@ async def create_cpr_guideline(data: dict, db: Session = Depends(get_db)):
         ventilation_volume=data["ventilation_volume"])
     db.add(cpr_guideline)
     db.commit()
+    db.refresh(cpr_guideline)
 
     return cpr_guideline
 
