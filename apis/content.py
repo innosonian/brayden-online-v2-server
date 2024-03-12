@@ -185,3 +185,19 @@ async def get_login_content(content_id: int, db: Session = Depends(get_db)):
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             return None
+
+
+@router.delete('/login/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_login_content(content_id: int, db: Session = Depends(get_db)):
+    try:
+        organization_content = check_exist_organization_content(content_id, db)
+        db.delete(organization_content)
+
+        # s3 delete
+        s3 = authorize_aws_s3()
+        ret = s3.delete_object(Bucket=BUCKET_NAME, Key=organization_content.s3_key)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(e.status_code, detail=e.message)
