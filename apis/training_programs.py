@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import TrainingProgram
 
-from schema.training_program import CreateRequestSchema
+from schema.training_program import CreateRequestSchema, CreateResponseSchema
 
 router = APIRouter(prefix='/training-programs')
 
 
-@router.post('', response_model=CreateRequestSchema)
+@router.post('', response_model=CreateResponseSchema)
 async def create_training_program(data: CreateRequestSchema, db: Session = Depends(get_db)):
     training_program = TrainingProgram(
         title=data.title,
