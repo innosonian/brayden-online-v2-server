@@ -71,7 +71,7 @@ class TrainingProgram(Base):
 
     cpr_guideline = relationship('CPRGuideline', back_populates='training_program')
     organization = relationship('Organization', back_populates='training_program')
-    training_program_content = relationship('TrainingProgram', back_populates='training_program')
+    training_program_content = relationship('TrainingProgramContent', back_populates='training_program')
 
 
 class TrainingProgramContent(Base):
