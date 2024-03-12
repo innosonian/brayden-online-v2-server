@@ -1,1 +1,1 @@
-from .model import User, UserRole, Base
+from .model import User, UserRole, Base, TrainingProgram, CPRGuideline
