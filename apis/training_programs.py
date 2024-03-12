@@ -113,3 +113,15 @@ async def update_training_program(training_program_id: int, data: UpdateRequestS
     except Exception as e:
         logging.error(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Internal Server Error')
+
+
+@router.delete('/{training_program_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_training_program(training_program_id: int, db: Session = Depends(get_db)):
+    try:
+        training_program = check_exist_training_program(training_program_id, db)
+        db.delete(training_program)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(status_code=e.status_code, detail=e.message)
