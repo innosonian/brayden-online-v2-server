@@ -70,3 +70,18 @@ class GetResponseSchema(BaseModel):
     cvr_ventilation: int | None = None
     compression_ventilation_ratio: str | None = None
     cpr_guideline: ResponseSchema | None = None
+
+
+class UpdateRequestSchema(BaseModel):
+    title: str | None = None
+    manikin_type: str | None = None
+    training_type: str | None = None
+    feedback_type: str | None = None
+    training_mode: str | None = None
+    compression_ventilation_ratio: str | None = None
+    cpr_guideline_id: int | None = None
+    duration: int | None = None
+    compression_limit: int | None = None
+    cycle_limit: int | None = None
+    ventilation_limit: int | None = None
+    organization_id: int | None = None
