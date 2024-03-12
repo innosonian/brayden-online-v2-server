@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, status, Depends, UploadFile, HTTPException
 
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, and_
 
 from datetime import datetime
 from database import get_db
@@ -10,10 +10,10 @@ from database import get_db
 from boto3 import client
 
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models.model import TrainingProgramContent
+from models.model import TrainingProgramContent, OrganizationContent
 from schema.content import CreateResponseSchema
 
-router = APIRouter(prefix='/content')
+router = APIRouter(prefix='/contents')
 
 BUCKET_NAME = 'brayden-online-v2-api-storage'
 
@@ -83,7 +83,8 @@ async def get_training_content(content_id: int, db: Session = Depends(get_db)):
         training_content = check_exist_training_content(content_id, db)
         return training_content.convert_to_schema
     except GetExceptionWithStatuscode as e:
-        raise HTTPException(e.status_code, detail=e.message)
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            return None
 
 
 @router.delete('/training-programs/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
@@ -99,3 +100,104 @@ async def delete_training_content(content_id: int, db: Session = Depends(get_db)
         return
     except GetExceptionWithStatuscode as e:
         raise HTTPException(e.status_code, detail=e.message)
+
+
+@router.post('/manikin_connected', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+async def create_manikin_connected(content: UploadFile, db: Session = Depends(get_db)):
+    # upload file to s3
+    s3_key = upload_file_to_s3(content)
+    if not s3_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
+
+    # db insert
+    # TODO 조직id 수정, manikin_type 에 따라서 content_type이 수정되야함
+    organization_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
+                                               content_type='manikin_connected_adult', organization_id=1)
+    db.add(organization_content)
+    db.commit()
+    db.refresh(organization_content)
+
+    return organization_content.convert_to_schema
+
+
+@router.get('/manikin_connected/{content_id}')
+async def get_manikin_connected(content_id: int, db: Session = Depends(get_db)):
+    # TODO 조직정보 조건이 필요
+    query = select(OrganizationContent).where(
+        and_(OrganizationContent.id == content_id))
+
+    organization_content = db.execute(query).scalar()
+    if organization_content:
+        return organization_content.convert_to_schema
+    else:
+        return None
+
+
+def check_exist_organization_content(content_id: int, db: Session = Depends(get_db)):
+    query = select(OrganizationContent).where(OrganizationContent.id == content_id)
+    organization_content = db.execute(query).scalar()
+    if organization_content is None:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='there is no content',
+                                         exception_type=ExceptionType.NOT_FOUND)
+    return organization_content
+
+
+@router.delete('/manikin_connected/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_manikin_connected(content_id: int, db: Session = Depends(get_db)):
+    try:
+        organization_content = check_exist_organization_content(content_id, db)
+        db.delete(organization_content)
+
+        # s3 delete
+        s3 = authorize_aws_s3()
+        ret = s3.delete_object(Bucket=BUCKET_NAME, Key=organization_content.s3_key)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(e.status_code, detail=e.message)
+
+
+@router.post('/login', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+async def create_login_content(content: UploadFile, db: Session = Depends(get_db)):
+    # upload file to s3
+    s3_key = upload_file_to_s3(content)
+    if not s3_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
+
+    # db insert
+    # TODO 조직id 수정
+    login_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
+                                        content_type='login', organization_id=1)
+    db.add(login_content)
+    db.commit()
+    db.refresh(login_content)
+
+    return login_content.convert_to_schema
+
+
+@router.get('/login/{content_id}')
+async def get_login_content(content_id: int, db: Session = Depends(get_db)):
+    try:
+        login_content = check_exist_organization_content(content_id, db)
+        return login_content.convert_to_schema
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            return None
+
+
+@router.delete('/login/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_login_content(content_id: int, db: Session = Depends(get_db)):
+    try:
+        organization_content = check_exist_organization_content(content_id, db)
+        db.delete(organization_content)
+
+        # s3 delete
+        s3 = authorize_aws_s3()
+        ret = s3.delete_object(Bucket=BUCKET_NAME, Key=organization_content.s3_key)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(e.status_code, detail=e.message)

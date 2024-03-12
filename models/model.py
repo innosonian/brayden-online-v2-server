@@ -38,6 +38,7 @@ class Organization(Base):
 
     users = relationship('User', back_populates='organization')
     training_program = relationship('TrainingProgram', back_populates='organization')
+    organization_content = relationship('OrganizationContent', back_populates='organization')
 
 
 class CPRGuideline(Base):
@@ -106,6 +107,51 @@ class TrainingProgramContent(Base):
                                          Params={'Bucket': BUCKET_NAME,
                                                  'Key': self.s3_key},
                                          ExpiresIn=3600)
+
+    @property
+    def convert_to_schema(self):
+        from schema.content import CreateResponseSchema
+        return CreateResponseSchema(
+            id=self.id,
+            file_name=self.file_name,
+            url=self.presigned_url
+        )
+
+
+class OrganizationContent(Base):
+    __tablename__ = 'organization_content'
+
+    id = Column(Integer, primary_key=True, index=True)
+    s3_key = Column(String(100))
+    file_name = Column(String(100))
+    content_type = Column(String(50))
+    organization_id = Column(Integer, ForeignKey('organization.id'))
+
+    organization = relationship('Organization', back_populates='organization_content')
+
+    @property
+    def presigned_url(self):
+        # TODO: DELETE THIS
+        def authorize_aws_s3():
+            import os
+            from boto3 import client
+            if os.environ.get('aws_access_key_id') and os.environ.get('aws_secret_access_key'):
+                access_key = os.environ.get('aws_access_key_id')
+                secret_access_key = os.environ.get('aws_secret_access_key')
+                s3 = client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_access_key)
+            else:
+                s3 = client('s3')
+            return s3
+
+        # TODO: DELETE THIS
+        BUCKET_NAME = 'brayden-online-v2-api-storage'
+
+        s3 = authorize_aws_s3()
+        return s3.generate_presigned_url('get_object',
+                                         Params={'Bucket': BUCKET_NAME,
+                                                 'Key': self.s3_key},
+                                         ExpiresIn=3600)
+
     @property
     def convert_to_schema(self):
         from schema.content import CreateResponseSchema
