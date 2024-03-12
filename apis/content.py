@@ -103,7 +103,7 @@ async def delete_training_content(content_id: int, db: Session = Depends(get_db)
 
 
 @router.post('/manikin_connected', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_manikin_connected_adult(content: UploadFile, db: Session = Depends(get_db)):
+async def create_manikin_connected(content: UploadFile, db: Session = Depends(get_db)):
     # upload file to s3
     s3_key = upload_file_to_s3(content)
     if not s3_key:
@@ -157,3 +157,21 @@ async def delete_manikin_connected(content_id: int, db: Session = Depends(get_db
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(e.status_code, detail=e.message)
+
+
+@router.post('/login', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+async def create_login(content: UploadFile, db: Session = Depends(get_db)):
+    # upload file to s3
+    s3_key = upload_file_to_s3(content)
+    if not s3_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
+
+    # db insert
+    # TODO 조직id 수정
+    login_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
+                                        content_type='login', organization_id=1)
+    db.add(login_content)
+    db.commit()
+    db.refresh(login_content)
+
+    return login_content.convert_to_schema
