@@ -122,7 +122,7 @@ async def create_manikin_connected_adult(content: UploadFile, db: Session = Depe
 
 @router.get('/manikin_connected/{content_id}')
 async def get_manikin_connected(content_id: int, db: Session = Depends(get_db)):
-    #TODO 조직정보 조건이 필요
+    # TODO 조직정보 조건이 필요
     query = select(OrganizationContent).where(
         and_(OrganizationContent.id == content_id))
 
@@ -132,3 +132,28 @@ async def get_manikin_connected(content_id: int, db: Session = Depends(get_db)):
     else:
         return None
 
+
+def check_exist_organization_content(content_id: int, db: Session = Depends(get_db)):
+    query = select(OrganizationContent).where(OrganizationContent.id == content_id)
+    organization_content = db.execute(query).scalar()
+    if organization_content is None:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='there is no content',
+                                         exception_type=ExceptionType.NOT_FOUND)
+    return organization_content
+
+
+@router.delete('/manikin_connected/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_manikin_connected(content_id: int, db: Session = Depends(get_db)):
+    try:
+        organization_content = check_exist_organization_content(content_id, db)
+        db.delete(organization_content)
+
+        # s3 delete
+        s3 = authorize_aws_s3()
+        ret = s3.delete_object(Bucket=BUCKET_NAME, Key=organization_content.s3_key)
+        db.commit()
+        return
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(e.status_code, detail=e.message)
