@@ -15,7 +15,7 @@ from schema.training_program import CreateRequestSchema, CreateResponseSchema, G
 router = APIRouter(prefix='/training-programs')
 
 
-@router.post('', response_model=CreateResponseSchema)
+@router.post('', response_model=CreateResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_training_program(data: CreateRequestSchema, db: Session = Depends(get_db)):
     training_program = data.convert_to_model
 
