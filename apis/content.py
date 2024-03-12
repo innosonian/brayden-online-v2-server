@@ -10,10 +10,10 @@ from database import get_db
 from boto3 import client
 
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models.model import TrainingProgramContent
+from models.model import TrainingProgramContent, OrganizationContent
 from schema.content import CreateResponseSchema
 
-router = APIRouter(prefix='/content')
+router = APIRouter(prefix='/contents')
 
 BUCKET_NAME = 'brayden-online-v2-api-storage'
 
@@ -99,3 +99,21 @@ async def delete_training_content(content_id: int, db: Session = Depends(get_db)
         return
     except GetExceptionWithStatuscode as e:
         raise HTTPException(e.status_code, detail=e.message)
+
+
+@router.post('/manikin_connected', status_code=status.HTTP_201_CREATED)
+async def create_manikin_connected_adult(content: UploadFile, db: Session = Depends(get_db)):
+    # upload file to s3
+    s3_key = upload_file_to_s3(content)
+    if not s3_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
+
+    # db insert
+    # TODO 조직id 수정, manikin_type 에 따라서 content_type이 수정되야함
+    organization_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
+                                               content_type='manikin_connected_adult', organization_id=1)
+    db.add(organization_content)
+    db.commit()
+    db.refresh(organization_content)
+
+    return organization_content.convert_to_schema
