@@ -17,7 +17,7 @@ from pandas import DataFrame, Timestamp
 
 from database import get_db
 from models import User, TrainingProgram
-from models.model import TrainingResult
+from models.model import TrainingResult, TrainingsDownloadOptions
 
 router = APIRouter(prefix='/trainings')
 
@@ -346,6 +346,110 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
              .options(joinedload(TrainingResult.users)).options(joinedload(TrainingResult.training_program)))
     training_result = db.scalar(query)
     return TrainingResultResponseSchema(training_result)
+
+
+@router.post('/download/options')
+def add_download_options(options: dict, request: Request, db: Session = Depends(get_db)):
+    token = request.headers['Authorization']
+    user_select_query = select(User).where(User.token == token)
+    user = db.scalar(user_select_query)
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+    download_options = TrainingsDownloadOptions(user_id=user.id, email=options['email'], score=options['score'],
+                                                username=options['username'], datetime=options['datetime'],
+                                                average_compression_depth=options['average_compression_depth'],
+                                                average_hands_off_time=options['average_hands_off_time'],
+                                                compression_number=options['compression_number'],
+                                                event_time=options['event_time'],
+                                                manikin_model=options['manikin_model'],
+                                                overall_ccf=options['overall_ccf'],
+                                                overall_compression_no=options['overall_compression_no'],
+                                                overall_hand_position=options['overall_hand_position'],
+                                                overall_ventilation_rate=options['overall_ventilation_rate'],
+                                                overall_ventilation_volume=options['overall_ventilation_volume'],
+                                                average_compression_rate=options['average_compression_rate'],
+                                                average_volume=options['average_volume'],
+                                                cycle_number=options['cycle_number'],
+                                                judge_result=options['judge_result'],
+                                                overall_compression_depth=options['overall_compression_depth'],
+                                                overall_compression_rate=options['overall_compression_rate'],
+                                                overall_recoil=options['overall_recoil'],
+                                                overall_ventilation_speed=options['overall_ventilation_speed'],
+                                                percentage_ccf=options['percentage_ccf'],
+                                                target=options['target'],
+                                                type=options['type'],
+                                                device_id=options['device_id'],
+                                                name=options['name']
+                                                )
+    db.add(download_options)
+    db.commit()
+    db.refresh(download_options)
+    return download_options
+
+
+@router.get('/download/options')
+def get_download_options(request: Request, db: Session = Depends(get_db)):
+    token = request.headers['Authorization']
+    user_select_query = select(User).where(User.token == token)
+    user = db.scalar(user_select_query)
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+    option_select_query = select(TrainingsDownloadOptions).where(user.id == TrainingsDownloadOptions.user_id)
+    options = db.scalar(option_select_query)
+    if not options:
+        new_options = TrainingsDownloadOptions(user_id=user.id)
+        db.add(new_options)
+        db.commit()
+        db.refresh(new_options)
+        return new_options
+
+    return options
+
+
+@router.put('/download/options')
+def update_download_options(options_param: dict, request: Request, db: Session = Depends(get_db)):
+    token = request.headers['Authorization']
+    user_select_query = select(User).where(User.token == token)
+    user = db.scalar(user_select_query)
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+    option_select_query = select(TrainingsDownloadOptions).where(user.id == TrainingsDownloadOptions.user_id)
+    options = db.scalar(option_select_query)
+    options.user_id = user.id
+    options.email = options_param['email']
+    options.score = options_param['score']
+    options.username = options_param['username']
+    options.datetime = options_param['datetime']
+    options.average_compression_depth = options_param['average_compression_depth']
+    options.average_hands_off_time = options_param['average_hands_off_time']
+    options.compression_number = options_param['compression_number']
+    options.event_time = options_param['event_time']
+    options.manikin_model = options_param['manikin_model']
+    options.overall_ccf = options_param['overall_ccf']
+    options.overall_compression_no = options_param['overall_compression_no']
+    options.overall_hand_position = options_param['overall_hand_position']
+    options.overall_ventilation_rate = options_param['overall_ventilation_rate']
+    options.overall_ventilation_volume = options_param['overall_ventilation_volume']
+    options.average_compression_rate = options_param['average_compression_rate']
+    options.average_volume = options_param['average_volume']
+    options.cycle_number = options_param['cycle_number']
+    options.judge_result = options_param['judge_result']
+    options.overall_compression_depth = options_param['overall_compression_depth']
+    options.overall_compression_rate = options_param['overall_compression_rate']
+    options.overall_recoil = options_param['overall_recoil']
+    options.overall_ventilation_speed = options_param['overall_ventilation_speed']
+    options.percentage_ccf = options_param['percentage_ccf']
+    options.target = options_param['target']
+    options.type = options_param['type']
+
+    db.add(options)
+    db.commit()
+    db.refresh(options)
+
+    return options
 
 
 def start_date_to_datetime(start_date):
