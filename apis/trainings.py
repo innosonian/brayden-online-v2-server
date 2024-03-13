@@ -348,6 +348,171 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
     return TrainingResultResponseSchema(training_result)
 
 
+def make_dataframe_from_list(data: list, column: list):
+    return DataFrame(data, columns=column)
+
+
+def store_training_data_to_excel(training_data: list, column: list):
+    file_name = 'training_records.xlsx'
+    # dataframe from model list
+    dataframe = make_dataframe_from_list(training_data, column)
+    # make excel
+    dataframe.to_excel(file_name)
+    return file_name
+
+
+def get_columns_from_options(option: TrainingsDownloadOptions):
+    column = []
+    if option.email:
+        column.append('email')
+    if option.datetime:
+        column.append('datetime')
+    if option.username:
+        column.append('username')
+    if option.score:
+        column.append('score')
+    if option.overall_ccf:
+        column.append('overall_ccf')
+    if option.overall_recoil:
+        column.append('overall_recoil')
+    if option.overall_hand_position:
+        column.append('overall_hand_position')
+    if option.overall_compression_depth:
+        column.append('overall_compression_depth')
+    if option.overall_compression_rate:
+        column.append('overall_compression_rate')
+    if option.overall_ventilation_rate:
+        column.append('overall_ventilation_rate')
+    if option.overall_ventilation_volume:
+        column.append('overall_ventilation_volume')
+    if option.judge_result:
+        column.append('judge_result')
+    if option.manikin_model:
+        column.append('manikin_model')
+    if option.event_time:
+        column.append('event_time')
+    if option.compression_number:
+        column.append('compression_number')
+    if option.overall_ventilation_speed:
+        column.append('overall_ventilation_speed')
+    if option.target:
+        column.append('target')
+    if option.device_id:
+        column.append('device_id')
+    if option.name:
+        column.append('name')
+    if option.average_volume:
+        column.append('average_volume')
+    if option.average_hands_off_time:
+        column.append('average_hands_off_time')
+    if option.average_compression_rate:
+        column.append('average_compression_rate')
+    if option.average_compression_depth:
+        column.append('average_compression_depth')
+    if option.cycle_number:
+        column.append('cycle_number')
+    if option.percentage_ccf:
+        column.append('percentage_ccf')
+
+    return column
+
+
+def choose_training_data_from_options(training_data: list, option: TrainingsDownloadOptions):
+    result = []
+    for data in training_data:
+        result_data = {}
+        # TODO 쓸데없이 고정 데이터 넣은거 제거
+        if option.email:
+            result_data['email'] = data.users.email
+        if option.datetime:
+            result_data['datetime'] = data.date
+        if option.username:
+            result_data['username'] = data.users.name
+        if option.score:
+            result_data['score'] = data.score
+        if option.overall_ccf:
+            result_data['overall_ccf'] = data.result['score']['ccf']
+        if option.overall_recoil:
+            result_data['overall_recoil'] = data.result['score']['compression_recoil']
+        if option.overall_hand_position:
+            result_data['overall_hand_position'] = data.result['score']['handposition']
+        if option.overall_compression_depth:
+            result_data['overall_compression_depth'] = data.result['score']['compression_depth']
+        if option.overall_compression_rate:
+            result_data['overall_compression_rate'] = data.result['score']['compression_rate']
+        if option.overall_ventilation_rate:
+            result_data['overall_ventilation_rate'] = data.result['score']['ventilation_rate']
+        if option.overall_ventilation_volume:
+            result_data['overall_ventilation_volume'] = data.result['score']['ventilation_volume']
+        if option.judge_result:
+            result_data['judge_result'] = data.result['is_passed']
+        if option.manikin_model:
+            result_data['manikin_model'] = 'Adult'
+        if option.event_time:
+            result_data['event_time'] = '2024-01-09'
+        if option.compression_number:
+            result_data['compression_number'] = 90
+        if option.overall_ventilation_speed:
+            result_data['overall_ventilation_speed'] = 90
+        if option.target:
+            result_data['target'] = 'SDL'
+        if option.device_id:
+            result_data['device_id'] = 's11se1'
+        if option.name:
+            result_data['name'] = 'skfn'
+        if option.average_volume:
+            result_data['average_volume'] = 80
+        if option.average_hands_off_time:
+            result_data['average_hands_off_time'] = 82
+        if option.average_compression_rate:
+            result_data['average_compression_rate'] = 77
+        if option.average_compression_depth:
+            result_data['average_compression_depth'] = 73
+        if option.cycle_number:
+            result_data['cycle_number'] = 3
+        if option.percentage_ccf:
+            result_data['percentage_ccf'] = 90
+        result.append(result_data)
+    return result
+
+
+@router.get('/download')
+async def download_file(request: Request, start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
+    token = request.headers['Authorization']
+    user_select_query = select(User).where(User.token == token)
+    user = db.scalar(user_select_query)
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+    options = db.query(TrainingsDownloadOptions).get(user.id)
+    if not options:
+        # create options
+        options = TrainingsDownloadOptions(user_id=user.id)
+        db.add(options)
+        db.commit()
+        db.refresh(options)
+
+    query = (select(TrainingResult)
+             .options(joinedload(TrainingResult.training_program).joinedload(TrainingProgram.cpr_guideline))
+             .options(joinedload(TrainingResult.users)))
+
+    if start_date:
+        datetime_start_date = start_date_to_datetime(start_date)
+        query = query.where(TrainingResult.date >= datetime_start_date)
+    if end_date:
+        datetime_end_date = end_date_to_datetime(end_date)
+        query = query.where(TrainingResult.date <= datetime_end_date)
+
+    query = query.order_by(TrainingResult.id.desc())
+    training_data = db.scalars(query).all()
+    # choose training history from option
+    column = get_columns_from_options(options)
+    data = choose_training_data_from_options(training_data, options)
+
+    file_name = store_training_data_to_excel(data, column)
+    return FileResponse(file_name, filename="records.xlsx")
+
+
 @router.post('/download/options')
 def add_download_options(options: dict, request: Request, db: Session = Depends(get_db)):
     token = request.headers['Authorization']
