@@ -1,6 +1,6 @@
 from database import Base
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DATETIME
+from sqlalchemy import Column, Integer, String, ForeignKey, DATETIME, BOOLEAN
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
@@ -20,6 +20,9 @@ class User(Base):
 
     organization = relationship('Organization', back_populates='users')
     users_role = relationship('UserRole', back_populates='users')
+    training_result = relationship('TrainingResult', back_populates='users')
+    trainings = relationship('Training', back_populates='users')
+    trainings_download_options = relationship('TrainingsDownloadOptions', back_populates='users')
 
 
 class UserRole(Base):
@@ -74,6 +77,8 @@ class TrainingProgram(Base):
     cpr_guideline = relationship('CPRGuideline', back_populates='training_program')
     organization = relationship('Organization', back_populates='training_program')
     training_program_content = relationship('TrainingProgramContent', back_populates='training_program')
+    training_result = relationship('TrainingResult', back_populates='training_program')
+    trainings = relationship('Training', back_populates='training_program')
 
 
 class TrainingProgramContent(Base):
@@ -173,7 +178,7 @@ class CertificationsTemplate(Base):
     images = Column(JSON)
     organization_id = Column(Integer, ForeignKey('organization.id'))
 
-    organization = relationship('Organization', back_populates='certifications_templates')
+    organization = relationship('Organization', back_populates='certifications_template')
 
     @property
     def presigned_url(self):
@@ -209,3 +214,66 @@ class CertificationsTemplate(Base):
         images_url = self.presigned_url
         return GetResponseSchema(id=self.id, title=self.title, organization=self.organization, images=images_url,
                                  manikin_type=self.manikin_type)
+
+
+class TrainingResult(Base):
+    __tablename__ = "training_result"
+
+    id = Column(Integer, primary_key=True, index=True)
+    result = Column(JSON)
+    data = Column(JSON)
+    date = Column(DATETIME)
+    score = Column(Integer)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    training_program_id = Column(Integer, ForeignKey('training_program.id'))
+
+    users = relationship("User", back_populates="training_result")
+    training_program = relationship("TrainingProgram", back_populates="training_result")
+
+
+class Training(Base):
+    __tablename__ = "trainings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    training_date = Column(DATETIME)
+    training_program_id = Column(Integer, ForeignKey("training_program.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    score = Column(Integer)
+
+    users = relationship("User", back_populates="trainings")
+    training_program = relationship("TrainingProgram", back_populates="trainings")
+
+
+class TrainingsDownloadOptions(Base):
+    __tablename__ = "trainings_download_options"
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True, index=True)
+    email = Column(BOOLEAN, default=True)
+    score = Column(BOOLEAN, default=True)
+    username = Column(BOOLEAN, default=True)
+    datetime = Column(BOOLEAN, default=True)
+    average_compression_depth = Column(BOOLEAN, default=False)
+    average_hands_off_time = Column(BOOLEAN, default=False)
+    compression_number = Column(BOOLEAN, default=False)
+    event_time = Column(BOOLEAN, default=False)
+    manikin_model = Column(BOOLEAN, default=False)
+    overall_ccf = Column(BOOLEAN, default=False)
+    overall_compression_no = Column(BOOLEAN, default=False)
+    overall_hand_position = Column(BOOLEAN, default=False)
+    overall_ventilation_rate = Column(BOOLEAN, default=False)
+    overall_ventilation_volume = Column(BOOLEAN, default=False)
+    average_compression_rate = Column(BOOLEAN, default=False)
+    average_volume = Column(BOOLEAN, default=False)
+    cycle_number = Column(BOOLEAN, default=False)
+    judge_result = Column(BOOLEAN, default=False)
+    overall_compression_depth = Column(BOOLEAN, default=False)
+    overall_compression_rate = Column(BOOLEAN, default=False)
+    overall_recoil = Column(BOOLEAN, default=False)
+    overall_ventilation_speed = Column(BOOLEAN, default=False)
+    percentage_ccf = Column(BOOLEAN, default=False)
+    target = Column(BOOLEAN, default=False)
+    type = Column(BOOLEAN, default=False)
+    device_id = Column(BOOLEAN, default=False)
+    name = Column(BOOLEAN, default=False)
+
+    users = relationship('User', back_populates='trainings_download_options')
