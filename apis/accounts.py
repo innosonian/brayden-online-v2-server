@@ -24,6 +24,10 @@ def get_my_account_info(request: Request, db: Session = Depends(get_db)):
         "token": user.token,
         "email": user.email,
         "name": user.name,
+        "role": {
+            "id": user.users_role.id,
+            "title": user.users_role.role
+        },
         "last_training_date": "2023-12-11",
         "certifications": {
             "adult": {
