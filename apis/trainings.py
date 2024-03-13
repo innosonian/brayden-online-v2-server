@@ -21,6 +21,8 @@ from models.model import TrainingResult
 
 router = APIRouter(prefix='/trainings')
 
+per_page = 30
+
 
 class CreateRequestSchema(BaseModel):
     training_program_id: int
@@ -74,6 +76,24 @@ class UserSchema:
         self.employee_id = user.employee_id
 
 
+class TrainingProgramDetailSchema(TrainingProgramResponseSchema):
+    training_type: str
+
+    def __init__(self, training_program: TrainingProgram):
+        super().__init__(training_program)
+        self.training_type = training_program.training_type
+
+
+class TrainingResponseSchema(TrainingBaseResponseSchema):
+    training_program: TrainingProgramDetailSchema
+    user: UserSchema
+
+    def __init__(self, training_result: TrainingResult):
+        super().__init__(training_result)
+        self.training_program = TrainingProgramDetailSchema(training_result.training_program)
+        self.user = UserSchema(training_result.users)
+
+
 class TrainingResultResponseSchema(TrainingBaseResponseSchema):
     training_program: TrainingProgramResponseSchema
     user: UserSchema
@@ -82,6 +102,41 @@ class TrainingResultResponseSchema(TrainingBaseResponseSchema):
         super().__init__(training_result)
         self.training_program = TrainingProgramResponseSchema(training_result.training_program)
         self.user = UserSchema(training_result.users)
+
+
+class TrainingProgramLimitSchema(TrainingProgramResponseSchema):
+    training_type: str
+    feedback_type: str
+    training_mode: str
+    duration: int
+    cycle_limit: int
+    compression_limit: int
+    ventilation_limit: int
+
+    def __init__(self, training_program: TrainingProgram):
+        super().__init__(training_program)
+        self.training_type = training_program.training_type
+        self.feedback_type = training_program.feedback_type
+        self.training_mode = training_program.training_mode
+        self.duration = training_program.duration
+        self.cycle_limit = training_program.cycle_limit
+        self.compression_limit = training_program.compression_limit
+        self.ventilation_limit = training_program.ventilation_limit
+
+
+class TrainingListSchema:
+    id: int
+    training_date: datetime
+    training_program: TrainingProgramLimitSchema
+    user: UserSchema
+    score: int
+
+    def __init__(self, training_result: TrainingResult):
+        self.id = training_result.id
+        self.training_date = training_result.date
+        self.training_program = TrainingProgramLimitSchema(training_result.training_program)
+        self.user = UserSchema(training_result.users)
+        self.score = training_result.score
 
 
 def get_calculate_type_from_training_type(training_type: str):
@@ -291,3 +346,54 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
              .options(joinedload(TrainingResult.users)).options(joinedload(TrainingResult.training_program)))
     training_result = db.scalar(query)
     return TrainingResultResponseSchema(training_result)
+
+
+def start_date_to_datetime(start_date):
+    return datetime.strptime(start_date, "%Y-%m-%d")
+
+
+def datetime_to_str(date_time: datetime):
+    return date_time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def end_date_to_datetime(end_date):
+    return datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+
+@router.get('')
+async def get_trainings(page: int = 1, user_id: int = None, start_date: str = None, end_date: str = None,
+                        db: Session = Depends(get_db)):
+    offset = (page - 1) * per_page
+    limit = page * per_page
+
+    query = (select(TrainingResult).options(joinedload(TrainingResult.users))
+             .options(joinedload(TrainingResult.training_program)))
+    if user_id:
+        query = query.where(TrainingResult.user_id == user_id)
+
+    if start_date:
+        datetime_start_date = start_date_to_datetime(start_date)
+        query = query.where(TrainingResult.date >= datetime_start_date)
+    if end_date:
+        datetime_end_date = end_date_to_datetime(end_date)
+        query = query.where(TrainingResult.date <= datetime_end_date)
+
+    filtered_data_count = db.scalar(select(func.count('*')).select_from(query))
+
+    query = query.offset(offset).limit(limit).order_by(TrainingResult.id.desc())
+    training_data = db.scalars(query).all()
+    result = []
+    for t in training_data:
+        result.append(TrainingListSchema(t))
+
+    return {"records": result, "total": filtered_data_count, "per_page": per_page, "current_page": page}
+
+
+@router.get("/{training_id}")
+async def get_training(training_id: int, db: Session = Depends(get_db)):
+    training_result = (db.query(TrainingResult).options(joinedload(TrainingResult.users))
+                       .options(joinedload(TrainingResult.training_program)).get(training_id))
+    if not training_result:
+        return None
+
+    return TrainingResponseSchema(training_result)
