@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, status, Depends, UploadFile, HTTPException
+from fastapi import APIRouter, status, Depends, UploadFile, HTTPException, Request
 
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import select, and_
@@ -10,7 +10,7 @@ from database import get_db
 from boto3 import client
 
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models.model import TrainingProgramContent, OrganizationContent
+from models.model import TrainingProgramContent, OrganizationContent, User
 from schema.content import CreateResponseSchema
 
 router = APIRouter(prefix='/contents')
@@ -51,8 +51,50 @@ def upload_file_to_s3(file: UploadFile):
     return False
 
 
+def check_exist_token(request):
+    headers = request.headers
+    if 'Authorization' not in headers:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='invalid token',
+                                         exception_type=ExceptionType.INVALID_TOKEN
+                                         )
+    return headers.get('Authorization')
+
+
+def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
+    if not token:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.INVALID_TOKEN,
+                                         message='invalid token')
+
+    select_query = select(User).where(User.token == token)
+    user = db.scalar(select_query)
+    if not user:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.NOT_MATCHED,
+                                         message='there is no user')
+    elif user.users_role_id != 3:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
+                                         exception_type=ExceptionType.INVALID_PERMISSION,
+                                         message='no authorization')
+
+    return user
+
+
 @router.post('/training-programs', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_training_content(content: UploadFile, db: Session = Depends(get_db)):
+async def create_training_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
+    try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
+
     # upload file to s3
     s3_key = upload_file_to_s3(content)
     if not s3_key:
@@ -78,18 +120,31 @@ def check_exist_training_content(content_id: int, db: Session = Depends(get_db))
 
 
 @router.get('/training-programs/{content_id}', response_model=CreateResponseSchema)
-async def get_training_content(content_id: int, db: Session = Depends(get_db)):
+async def get_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         training_content = check_exist_training_content(content_id, db)
         return training_content.convert_to_schema
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.NOT_FOUND:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
             return None
+        return
 
 
 @router.delete('/training-programs/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
-async def delete_training_content(content_id: int, db: Session = Depends(get_db)):
+async def delete_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         training_content = check_exist_training_content(content_id, db)
         db.delete(training_content)
 
@@ -99,11 +154,20 @@ async def delete_training_content(content_id: int, db: Session = Depends(get_db)
         db.commit()
         return
     except GetExceptionWithStatuscode as e:
-        raise HTTPException(e.status_code, detail=e.message)
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            return None
+        else:
+            raise HTTPException(e.status_code, detail=e.message)
 
 
 @router.post('/manikin_connected', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_manikin_connected(content: UploadFile, db: Session = Depends(get_db)):
+async def create_manikin_connected(request: Request, content: UploadFile, db: Session = Depends(get_db)):
     # upload file to s3
     s3_key = upload_file_to_s3(content)
     if not s3_key:
@@ -121,7 +185,19 @@ async def create_manikin_connected(content: UploadFile, db: Session = Depends(ge
 
 
 @router.get('/manikin_connected/{content_id}')
-async def get_manikin_connected(content_id: int, db: Session = Depends(get_db)):
+async def get_manikin_connected(request: Request, content_id: int, db: Session = Depends(get_db)):
+    try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
     # TODO 조직정보 조건이 필요
     query = select(OrganizationContent).where(
         and_(OrganizationContent.id == content_id))
@@ -144,8 +220,10 @@ def check_exist_organization_content(content_id: int, db: Session = Depends(get_
 
 
 @router.delete('/manikin_connected/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
-async def delete_manikin_connected(content_id: int, db: Session = Depends(get_db)):
+async def delete_manikin_connected(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
         organization_content = check_exist_organization_content(content_id, db)
         db.delete(organization_content)
 
@@ -155,12 +233,31 @@ async def delete_manikin_connected(content_id: int, db: Session = Depends(get_db
         db.commit()
         return
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.NOT_FOUND:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(e.status_code, detail=e.message)
+        return
 
 
 @router.post('/login', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_login_content(content: UploadFile, db: Session = Depends(get_db)):
+async def create_login_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
+    try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
     # upload file to s3
     s3_key = upload_file_to_s3(content)
     if not s3_key:
@@ -178,18 +275,31 @@ async def create_login_content(content: UploadFile, db: Session = Depends(get_db
 
 
 @router.get('/login/{content_id}')
-async def get_login_content(content_id: int, db: Session = Depends(get_db)):
+async def get_login_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         login_content = check_exist_organization_content(content_id, db)
         return login_content.convert_to_schema
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.NOT_FOUND:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
             return None
+        return
 
 
 @router.delete('/login/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
-async def delete_login_content(content_id: int, db: Session = Depends(get_db)):
+async def delete_login_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         organization_content = check_exist_organization_content(content_id, db)
         db.delete(organization_content)
 
@@ -199,5 +309,13 @@ async def delete_login_content(content_id: int, db: Session = Depends(get_db)):
         db.commit()
         return
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.NOT_FOUND:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(e.status_code, detail=e.message)
+
+        return

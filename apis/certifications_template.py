@@ -83,6 +83,13 @@ def upload_file_and_get_presigned_url(upload_file):
 
 @router.get("/{manikin_type}", status_code=status.HTTP_200_OK, response_model=GetResponseSchema)
 async def get_certifications_template(request: Request, manikin_type: str, db: Session = Depends(get_db)):
+    token = request.headers['Authorization']
+    # check user from token
+    token_query = select(User).where(User.token == token)
+    user = db.scalar(token_query)
+    if not user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
     try:
         user = check_authorization(request, db)
         query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.users)).where(

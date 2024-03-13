@@ -295,7 +295,6 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 @router.patch('/{user_id}')
 async def update_user(request: Request, user_id: int, user_data: UserUpdateRequestSchema,
                       db: Session = Depends(get_db)):
-    token = request.headers.get('Authorization')
     try:
         token = get_token_by_header(request.headers)
         me = get_user_by_token(token, db)

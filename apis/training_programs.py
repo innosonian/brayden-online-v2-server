@@ -1,22 +1,64 @@
 import logging
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Request
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import select, and_, update
 
 from database import get_db
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models import TrainingProgram
+from models import TrainingProgram, User
 from schema.cpr_guideline import ResponseSchema
 
 from schema.training_program import CreateRequestSchema, CreateResponseSchema, GetResponseSchema, UpdateRequestSchema
 
 router = APIRouter(prefix='/training-programs')
 
-#TODO training program을 작업할 때 권한 확인
+
+def check_exist_token(request):
+    headers = request.headers
+    if 'Authorization' not in headers:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='invalid token',
+                                         exception_type=ExceptionType.INVALID_TOKEN
+                                         )
+    return headers.get('Authorization')
+
+
+def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
+    if not token:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.INVALID_TOKEN,
+                                         message='invalid token')
+
+    select_query = select(User).where(User.token == token)
+    user = db.scalar(select_query)
+    if not user:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.NOT_MATCHED,
+                                         message='there is no user')
+    elif user.users_role_id != 3:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
+                                         exception_type=ExceptionType.INVALID_PERMISSION,
+                                         message='no authorization')
+
+    return user
+
+
 @router.post('', response_model=CreateResponseSchema, status_code=status.HTTP_201_CREATED)
-async def create_training_program(data: CreateRequestSchema, db: Session = Depends(get_db)):
+async def create_training_program(request: Request, data: CreateRequestSchema, db: Session = Depends(get_db)):
+    try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
     training_program = data.convert_to_model
 
     db.add(training_program)
@@ -70,12 +112,15 @@ def check_exist_training_program(id: int, db: Session = Depends(get_db)):
 
 
 @router.put('/{training_program_id}')
-async def update_training_program(training_program_id: int, data: UpdateRequestSchema,
+async def update_training_program(request: Request, training_program_id: int, data: UpdateRequestSchema,
                                   db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         training_program = check_exist_training_program(training_program_id, db)
         training_data = dict()
-        #TODO 데이터 변환을 어떻게 하면 좋을지
+        # TODO 데이터 변환을 어떻게 하면 좋을지
         if data.compression_ventilation_ratio:
             cvr = data.compression_ventilation_ratio
             split_cvr = cvr.split(':')
@@ -110,14 +155,24 @@ async def update_training_program(training_program_id: int, data: UpdateRequestS
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(status_code=e.status_code, detail=e.message)
+        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
     except Exception as e:
         logging.error(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Internal Server Error')
 
 
 @router.delete('/{training_program_id}', status_code=status.HTTP_204_NO_CONTENT)
-async def delete_training_program(training_program_id: int, db: Session = Depends(get_db)):
+async def delete_training_program(request: Request, training_program_id: int, db: Session = Depends(get_db)):
     try:
+        token = check_exist_token(request)
+        get_authorized_user_by_token(token, db)
+
         training_program = check_exist_training_program(training_program_id, db)
         db.delete(training_program)
         db.commit()
@@ -125,3 +180,10 @@ async def delete_training_program(training_program_id: int, db: Session = Depend
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(status_code=e.status_code, detail=e.message)
+        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
