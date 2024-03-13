@@ -13,30 +13,9 @@ from sqlalchemy import select
 from uuid import uuid1
 from datetime import datetime, timedelta
 
-from pydantic import BaseModel
+from schema.authorization import RoleResponse, UserResponseSchema, LoginRequestSchema, BaseResponseSchema
 
 router = APIRouter()
-
-
-class LoginRequestSchema(BaseModel):
-    email: str
-    password: str
-
-
-class BaseResponseSchema(BaseModel):
-    email: str
-    name: str
-    token: str
-    id: int
-
-
-class RoleResponse(BaseModel):
-    id: int
-    title: str
-
-
-class UserResponseSchema(BaseResponseSchema):
-    role: RoleResponse
 
 
 def convert_to_schema(user: User):
