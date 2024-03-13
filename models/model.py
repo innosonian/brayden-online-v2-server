@@ -30,6 +30,7 @@ class UserRole(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     role = Column(String(50), unique=True)
+
     users = relationship('User', back_populates="users_role")
 
 

@@ -13,21 +13,27 @@ from sqlalchemy import select
 from uuid import uuid1
 from datetime import datetime, timedelta
 
-from pydantic import BaseModel
+from schema.authorization import RoleResponse, UserResponseSchema, LoginRequestSchema, BaseResponseSchema
 
 router = APIRouter()
 
 
-class LoginRequestSchema(BaseModel):
-    email: str
-    password: str
-
-
-class LoginResponseSchema(BaseModel):
-    email: str
-    name: str
-    token: str
-    id: int
+def convert_to_schema(user: User):
+    if not user:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         message='user not found',
+                                         exception_type=ExceptionType.NOT_FOUND)
+    role = RoleResponse(
+        id=user.users_role.id,
+        title=user.users_role.role
+    )
+    return UserResponseSchema(
+        email=user.email,
+        name=user.name,
+        token=user.token,
+        id=user.id,
+        role=role
+    )
 
 
 def get_user_by_email(email, db: Session = Depends(get_db)):
@@ -48,25 +54,27 @@ def validate_login_data(user, password):
     return user
 
 
-@router.post('/login', status_code=status.HTTP_200_OK, response_model=LoginResponseSchema)
+@router.post('/login', status_code=status.HTTP_200_OK, response_model=UserResponseSchema)
 async def login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
     try:
         user_by_email = get_user_by_email(login_data.email, db)
         user = validate_login_data(user_by_email, login_data.password)
+        # insert token value
+        token = uuid1().__str__()
+        user.token = token
+        # 구체적인 토큰 유효기간 정책이 정해지지 않았으므로 긴 유효기간으로 설정
+        user.token_expiration = datetime.now() + timedelta(days=365 * 999)
+
+        db.add(user)
+        db.commit()
+        return convert_to_schema(user)
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_MATCHED:
             logging.error(e.message)
             raise HTTPException(e.status_code, detail=e.message)
-
-    # insert token value
-    token = uuid1().__str__()
-    user.token = token
-    # 구체적인 토큰 유효기간 정책이 정해지지 않았으므로 긴 유효기간으로 설정
-    user.token_expiration = datetime.now() + timedelta(days=365 * 999)
-
-    db.add(user)
-    db.commit()
-    return user
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e)
+            raise HTTPException(e.status_code, detail=e.message)
 
 
 def check_admin_by_role(user):
@@ -76,7 +84,7 @@ def check_admin_by_role(user):
                                          ExceptionType.INVALID_PERMISSION)
 
 
-@router.post('/login/admin', response_model=LoginResponseSchema)
+@router.post('/login/admin', response_model=BaseResponseSchema)
 async def admin_login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
     try:
         user_by_email = get_user_by_email(login_data.email, db)
