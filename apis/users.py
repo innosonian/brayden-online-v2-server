@@ -66,6 +66,10 @@ async def create_user(request: Request, user: UserCreateRequestSchema, db: Sessi
     def hashed_password(password: str):
         return hashpw(password.encode('utf-8'), salt)
 
+    #check user role exist if no value insert student
+    if user.user_role_id is None:
+        user.user_role_id = 1
+
     password_hashed = hashed_password(user.password).decode('utf-8')
     insert_user = User(email=user.email, name=user.name, password_hashed=password_hashed, employee_id=user.employee_id,
                        user_role_id=user.user_role_id, organization_id=organization_id)
