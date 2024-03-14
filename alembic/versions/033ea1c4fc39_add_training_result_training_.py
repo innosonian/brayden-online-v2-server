@@ -29,7 +29,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('training_program_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['training_program_id'], ['training_program.id'], name=op.f('fk_training_result_training_program_id_training_program')),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_training_result_user_id_users')),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('fk_training_result_user_id_user')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_training_result'))
     )
     op.create_index(op.f('ix_training_result_id'), 'training_result', ['id'], unique=False)
@@ -40,7 +40,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('score', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['training_program_id'], ['training_program.id'], name=op.f('fk_trainings_training_program_id_training_program')),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_trainings_user_id_users')),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('fk_trainings_user_id_user')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_trainings'))
     )
     op.create_index(op.f('ix_trainings_id'), 'trainings', ['id'], unique=False)
@@ -73,7 +73,7 @@ def upgrade() -> None:
     sa.Column('type', sa.BOOLEAN(), nullable=True),
     sa.Column('device_id', sa.BOOLEAN(), nullable=True),
     sa.Column('name', sa.BOOLEAN(), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_trainings_download_options_user_id_users')),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('fk_trainings_download_options_user_id_user')),
     sa.PrimaryKeyConstraint('user_id', name=op.f('pk_trainings_download_options'))
     )
     # ### end Alembic commands ###
