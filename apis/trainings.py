@@ -17,7 +17,7 @@ from pandas import DataFrame, Timestamp
 
 from database import get_db
 from models import User, TrainingProgram
-from models.model import TrainingResult, TrainingsDownloadOptions
+from models.model import Training, TrainingsDownloadOptions
 from schema.trainings import TrainingResultResponseSchema, TrainingListSchema, TrainingResponseSchema
 
 router = APIRouter(prefix='/trainings')
@@ -231,16 +231,16 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
 
         training_result_data['score']['by_cycle'].append(by_cycle)
 
-    trainings = TrainingResult(score=total_score, date=create_epoch, result=training_result_data,
-                               data=json.loads(training_data.training_data), user_id=user.id,
-                               training_program_id=training_data.training_program_id)
+    trainings = Training(score=total_score, date=create_epoch, result=training_result_data,
+                         data=json.loads(training_data.training_data), user_id=user.id,
+                         training_program_id=training_data.training_program_id)
 
     db.add(trainings)
     db.commit()
     db.refresh(trainings)
 
-    query = (select(TrainingResult).where(TrainingResult.id == trainings.id)
-             .options(joinedload(TrainingResult.user)).options(joinedload(TrainingResult.training_program)))
+    query = (select(Training).where(Training.id == trainings.id)
+             .options(joinedload(Training.user)).options(joinedload(Training.training_program)))
     training_result = db.scalar(query)
     return TrainingResultResponseSchema(training_result)
 
@@ -389,18 +389,18 @@ async def download_file(request: Request, start_date: str = None, end_date: str 
         db.commit()
         db.refresh(options)
 
-    query = (select(TrainingResult)
-             .options(joinedload(TrainingResult.training_program).joinedload(TrainingProgram.cpr_guideline))
-             .options(joinedload(TrainingResult.user)))
+    query = (select(Training)
+             .options(joinedload(Training.training_program).joinedload(TrainingProgram.cpr_guideline))
+             .options(joinedload(Training.user)))
 
     if start_date:
         datetime_start_date = start_date_to_datetime(start_date)
-        query = query.where(TrainingResult.date >= datetime_start_date)
+        query = query.where(Training.date >= datetime_start_date)
     if end_date:
         datetime_end_date = end_date_to_datetime(end_date)
-        query = query.where(TrainingResult.date <= datetime_end_date)
+        query = query.where(Training.date <= datetime_end_date)
 
-    query = query.order_by(TrainingResult.id.desc())
+    query = query.order_by(Training.id.desc())
     training_data = db.scalars(query).all()
     # choose training history from option
     column = get_columns_from_options(options)
@@ -532,21 +532,21 @@ async def get_trainings(page: int = 1, user_id: int = None, start_date: str = No
     offset = (page - 1) * per_page
     limit = page * per_page
 
-    query = (select(TrainingResult).options(joinedload(TrainingResult.user))
-             .options(joinedload(TrainingResult.training_program)))
+    query = (select(Training).options(joinedload(Training.user))
+             .options(joinedload(Training.training_program)))
     if user_id:
-        query = query.where(TrainingResult.user_id == user_id)
+        query = query.where(Training.user_id == user_id)
 
     if start_date:
         datetime_start_date = start_date_to_datetime(start_date)
-        query = query.where(TrainingResult.date >= datetime_start_date)
+        query = query.where(Training.date >= datetime_start_date)
     if end_date:
         datetime_end_date = end_date_to_datetime(end_date)
-        query = query.where(TrainingResult.date <= datetime_end_date)
+        query = query.where(Training.date <= datetime_end_date)
 
     filtered_data_count = db.scalar(select(func.count('*')).select_from(query))
 
-    query = query.offset(offset).limit(limit).order_by(TrainingResult.id.desc())
+    query = query.offset(offset).limit(limit).order_by(Training.id.desc())
     training_data = db.scalars(query).all()
     result = []
     for t in training_data:
@@ -557,8 +557,8 @@ async def get_trainings(page: int = 1, user_id: int = None, start_date: str = No
 
 @router.get("/{training_id}")
 async def get_training(training_id: int, db: Session = Depends(get_db)):
-    training_result = (db.query(TrainingResult).options(joinedload(TrainingResult.user))
-                       .options(joinedload(TrainingResult.training_program)).get(training_id))
+    training_result = (db.query(Training).options(joinedload(Training.user))
+                       .options(joinedload(Training.training_program)).get(training_id))
     if not training_result:
         return None
 

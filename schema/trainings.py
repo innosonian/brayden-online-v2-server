@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models.model import TrainingResult, TrainingProgram, User
+from models.model import Training, TrainingProgram, User
 
 
 class TrainingBaseResponseSchema:
@@ -11,7 +11,7 @@ class TrainingBaseResponseSchema:
     score: dict
     training_data: dict
 
-    def __init__(self, training_result: TrainingResult):
+    def __init__(self, training_result: Training):
         self.id = training_result.id
         self.datetime = training_result.date
         self.guide_prompt = training_result.result["guide_prompt"]
@@ -56,7 +56,7 @@ class TrainingResponseSchema(TrainingBaseResponseSchema):
     training_program: TrainingProgramDetailSchema
     user: UserSchema
 
-    def __init__(self, training_result: TrainingResult):
+    def __init__(self, training_result: Training):
         super().__init__(training_result)
         self.training_program = TrainingProgramDetailSchema(training_result.training_program)
         self.user = UserSchema(training_result.user)
@@ -66,7 +66,7 @@ class TrainingResultResponseSchema(TrainingBaseResponseSchema):
     training_program: TrainingProgramResponseSchema
     user: UserSchema
 
-    def __init__(self, training_result: TrainingResult):
+    def __init__(self, training_result: Training):
         super().__init__(training_result)
         self.training_program = TrainingProgramResponseSchema(training_result.training_program)
         self.user = UserSchema(training_result.user)
@@ -99,7 +99,7 @@ class TrainingListSchema:
     user: UserSchema
     score: int
 
-    def __init__(self, training_result: TrainingResult):
+    def __init__(self, training_result: Training):
         self.id = training_result.id
         self.training_date = training_result.date
         self.training_program = TrainingProgramLimitSchema(training_result.training_program)

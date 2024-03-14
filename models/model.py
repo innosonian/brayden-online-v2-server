@@ -20,8 +20,7 @@ class User(Base):
 
     organization = relationship('Organization', back_populates='user')
     user_role = relationship('UserRole', back_populates='user')
-    training_result = relationship('TrainingResult', back_populates='user')
-    trainings = relationship('Training', back_populates='user')
+    training = relationship('Training', back_populates='user')
     trainings_download_options = relationship('TrainingsDownloadOptions', back_populates='user')
 
 
@@ -78,8 +77,7 @@ class TrainingProgram(Base):
     cpr_guideline = relationship('CPRGuideline', back_populates='training_program')
     organization = relationship('Organization', back_populates='training_program')
     training_program_content = relationship('TrainingProgramContent', back_populates='training_program')
-    training_result = relationship('TrainingResult', back_populates='training_program')
-    trainings = relationship('Training', back_populates='training_program')
+    training = relationship('Training', back_populates='training_program')
 
 
 class TrainingProgramContent(Base):
@@ -217,8 +215,8 @@ class CertificationsTemplate(Base):
                                  manikin_type=self.manikin_type)
 
 
-class TrainingResult(Base):
-    __tablename__ = "training_result"
+class Training(Base):
+    __tablename__ = "training"
 
     id = Column(Integer, primary_key=True, index=True)
     result = Column(JSON)
@@ -228,21 +226,8 @@ class TrainingResult(Base):
     user_id = Column(Integer, ForeignKey("user.id"))
     training_program_id = Column(Integer, ForeignKey('training_program.id'))
 
-    user = relationship("User", back_populates="training_result")
-    training_program = relationship("TrainingProgram", back_populates="training_result")
-
-
-class Training(Base):
-    __tablename__ = "trainings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    training_date = Column(DATETIME)
-    training_program_id = Column(Integer, ForeignKey("training_program.id"))
-    user_id = Column(Integer, ForeignKey("user.id"))
-    score = Column(Integer)
-
-    user = relationship("User", back_populates="trainings")
-    training_program = relationship("TrainingProgram", back_populates="trainings")
+    user = relationship("User", back_populates="training")
+    training_program = relationship("TrainingProgram", back_populates="training")
 
 
 class TrainingsDownloadOptions(Base):
