@@ -215,23 +215,23 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 @router.get('', status_code=status.HTTP_200_OK)
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     def get_users_by_search_keyword(search_keyword):
-        def all_users(limit: int, offset: int = 0):
-            query = select(User).order_by(User.id.desc())
-            return db.scalars(query.offset(offset).limit(limit)).all(), query
+        def all_users(offset: int = 0):
+            query = select(User).order_by(User.id.desc()).offset(offset).fetch(per_page)
+            users = db.execute(query).scalars().all()
+            return users, query
 
-        def filtered_users(search_keyword, limit: int, offset: int = 0):
+        def filtered_users(search_keyword, offset: int = 0):
             query = (select(User).where(or_(User.email.contains(search_keyword),
                                             User.employee_id.contains(search_keyword),
                                             User.name.contains(search_keyword))).order_by(User.id.desc()))
-            return db.scalars(query.limit(limit).offset(offset)).all(), query
+            return db.scalars(query.fetch(per_page).offset(offset)).all(), query
 
         offset = (page - 1) * per_page
-        limit = page * per_page
 
         if search_keyword:
-            users, query = filtered_users(search_keyword, limit, offset)
+            users, query = filtered_users(search_keyword, offset)
         else:
-            users, query = all_users(limit, offset)
+            users, query = all_users(offset)
 
         # all user count
         filtered_data_count = db.scalar(select(func.count('*')).select_from(query))
