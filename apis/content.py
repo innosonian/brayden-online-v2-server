@@ -51,7 +51,7 @@ def upload_file_to_s3(file: UploadFile):
     return False
 
 
-def check_exist_token(request):
+def check_exist_token(request: Request):
     headers = request.headers
     if 'Authorization' not in headers:
         raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
@@ -60,6 +60,20 @@ def check_exist_token(request):
                                          )
     return headers.get('Authorization')
 
+
+def get_user_by_token(token: str, db: Session = Depends(get_db)):
+    if not token:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.INVALID_TOKEN,
+                                         message='invalid token')
+
+    select_query = select(User).where(User.token == token)
+    user = db.scalar(select_query)
+    if not user:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
+                                         exception_type=ExceptionType.NOT_MATCHED,
+                                         message='there is no user')
+    return user
 
 def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
     if not token:
@@ -123,7 +137,7 @@ def check_exist_training_content(content_id: int, db: Session = Depends(get_db))
 async def get_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        get_user_by_token(token, db)
 
         training_content = check_exist_training_content(content_id, db)
         return training_content.convert_to_schema
@@ -166,17 +180,32 @@ async def delete_training_content(request: Request, content_id: int, db: Session
             raise HTTPException(e.status_code, detail=e.message)
 
 
-@router.post('/manikin_connected', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_manikin_connected(request: Request, content: UploadFile, db: Session = Depends(get_db)):
+@router.post('/manikin_connected/{manikin_type}', status_code=status.HTTP_201_CREATED,
+             response_model=CreateResponseSchema)
+async def create_manikin_connected(request: Request, manikin_type: str, content: UploadFile,
+                                   db: Session = Depends(get_db)):
+    try:
+        token = check_exist_token(request)
+        user = get_authorized_user_by_token(token, db)
+
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_PERMISSION:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.NOT_MATCHED:
+            raise HTTPException(e.status_code, e.message)
+        elif e.exception_type == ExceptionType.INVALID_TOKEN:
+            raise HTTPException(e.status_code, e.message)
+        return
+
     # upload file to s3
     s3_key = upload_file_to_s3(content)
     if not s3_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
 
     # db insert
-    # TODO 조직id 수정, manikin_type 에 따라서 content_type이 수정되야함
     organization_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
-                                               content_type='manikin_connected_adult', organization_id=1)
+                                               content_type=f'manikin_connected_{manikin_type}',
+                                               organization_id=user.organization_id)
     db.add(organization_content)
     db.commit()
     db.refresh(organization_content)
@@ -188,7 +217,7 @@ async def create_manikin_connected(request: Request, content: UploadFile, db: Se
 async def get_manikin_connected(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        user = get_user_by_token(token, db)
 
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.INVALID_PERMISSION:
@@ -198,9 +227,9 @@ async def get_manikin_connected(request: Request, content_id: int, db: Session =
         elif e.exception_type == ExceptionType.INVALID_TOKEN:
             raise HTTPException(e.status_code, e.message)
         return
-    # TODO 조직정보 조건이 필요
+
     query = select(OrganizationContent).where(
-        and_(OrganizationContent.id == content_id))
+        and_(OrganizationContent.id == content_id, OrganizationContent.organization_id == user.organization_id))
 
     organization_content = db.execute(query).scalar()
     if organization_content:
@@ -248,7 +277,7 @@ async def delete_manikin_connected(request: Request, content_id: int, db: Sessio
 async def create_login_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        user = get_authorized_user_by_token(token, db)
 
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.INVALID_PERMISSION:
@@ -264,9 +293,9 @@ async def create_login_content(request: Request, content: UploadFile, db: Sessio
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
 
     # db insert
-    # TODO 조직id 수정
+
     login_content = OrganizationContent(s3_key=s3_key, file_name=content.filename,
-                                        content_type='login', organization_id=1)
+                                        content_type='login', organization_id=user.organization_id)
     db.add(login_content)
     db.commit()
     db.refresh(login_content)
@@ -278,7 +307,7 @@ async def create_login_content(request: Request, content: UploadFile, db: Sessio
 async def get_login_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        get_user_by_token(token, db)
 
         login_content = check_exist_organization_content(content_id, db)
         return login_content.convert_to_schema
