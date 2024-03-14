@@ -31,8 +31,8 @@ class CreateRequestSchema(BaseModel):
             compression_limit=self.compression_limit,
             cycle_limit=self.cycle_limit,
             ventilation_limit=self.ventilation_limit,
-            per_compression=self.per_compression,
-            per_ventilation=self.per_ventilation,
+            cvr_compression=self.cvr_compression,
+            cvr_ventilation=self.cvr_ventilation,
             cpr_guideline_id=self.cpr_guideline_id if self.cpr_guideline_id else 2,
             organization_id=self.organization_id
         )

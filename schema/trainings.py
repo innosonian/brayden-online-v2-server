@@ -59,7 +59,7 @@ class TrainingResponseSchema(TrainingBaseResponseSchema):
     def __init__(self, training_result: TrainingResult):
         super().__init__(training_result)
         self.training_program = TrainingProgramDetailSchema(training_result.training_program)
-        self.user = UserSchema(training_result.users)
+        self.user = UserSchema(training_result.user)
 
 
 class TrainingResultResponseSchema(TrainingBaseResponseSchema):
@@ -69,7 +69,7 @@ class TrainingResultResponseSchema(TrainingBaseResponseSchema):
     def __init__(self, training_result: TrainingResult):
         super().__init__(training_result)
         self.training_program = TrainingProgramResponseSchema(training_result.training_program)
-        self.user = UserSchema(training_result.users)
+        self.user = UserSchema(training_result.user)
 
 
 class TrainingProgramLimitSchema(TrainingProgramResponseSchema):
@@ -103,5 +103,5 @@ class TrainingListSchema:
         self.id = training_result.id
         self.training_date = training_result.date
         self.training_program = TrainingProgramLimitSchema(training_result.training_program)
-        self.user = UserSchema(training_result.users)
+        self.user = UserSchema(training_result.user)
         self.score = training_result.score

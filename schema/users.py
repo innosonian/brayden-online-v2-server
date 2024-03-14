@@ -15,7 +15,7 @@ class UserCreateResponseSchema(BaseModel):
     email: str
     name: str
     employee_id: str | None
-    users_role_id: int | None
+    user_role_id: int | None
 
 
 class UserUpdateRequestSchema(BaseModel):

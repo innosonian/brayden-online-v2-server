@@ -92,7 +92,7 @@ async def get_certifications_template(request: Request, manikin_type: str, db: S
 
     try:
         user = check_authorization(request, db)
-        query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.users)).where(
+        query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.user)).where(
             and_(User.id == user.id, CertificationsTemplate.manikin_type == manikin_type))
         certification = db.scalar(query)
         if certification:
@@ -124,7 +124,7 @@ async def update_certification_template(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
 
     title = request._form.get('title')
-    query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.users)).where(
+    query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.user)).where(
         and_(User.id == user.id, CertificationsTemplate.manikin_type == manikin_type))
     certification = db.scalar(query)
     file_names = certification.images

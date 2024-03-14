@@ -68,7 +68,7 @@ async def create_user(request: Request, user: UserCreateRequestSchema, db: Sessi
 
     password_hashed = hashed_password(user.password).decode('utf-8')
     insert_user = User(email=user.email, name=user.name, password_hashed=password_hashed, employee_id=user.employee_id,
-                       users_role_id=user.user_role_id, organization_id=organization_id)
+                       user_role_id=user.user_role_id, organization_id=organization_id)
     db.add(insert_user)
     db.commit()
     db.refresh(insert_user)
@@ -272,7 +272,7 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
 def get_user_by_token(token: str, db: Session = Depends(get_db)):
     if not token:
         raise GetException('invalid token', ExceptionType.INVALID_TOKEN)
-    select_user = select(User).options(joinedload(User.users_role)).where(User.token == token)
+    select_user = select(User).options(joinedload(User.user_role)).where(User.token == token)
     user = db.scalar(select_user)
     if not user:
         raise GetException("invalid token", ExceptionType.NOT_FOUND)
@@ -280,7 +280,7 @@ def get_user_by_token(token: str, db: Session = Depends(get_db)):
 
 
 def check_user_permission(user: User):
-    if user.users_role.role != 'administrator':
+    if user.user_role.role != 'administrator':
         raise GetException('invalid token', ExceptionType.INVALID_PERMISSION)
 
 

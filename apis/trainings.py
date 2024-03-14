@@ -240,7 +240,7 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
     db.refresh(trainings)
 
     query = (select(TrainingResult).where(TrainingResult.id == trainings.id)
-             .options(joinedload(TrainingResult.users)).options(joinedload(TrainingResult.training_program)))
+             .options(joinedload(TrainingResult.user)).options(joinedload(TrainingResult.training_program)))
     training_result = db.scalar(query)
     return TrainingResultResponseSchema(training_result)
 
@@ -391,7 +391,7 @@ async def download_file(request: Request, start_date: str = None, end_date: str 
 
     query = (select(TrainingResult)
              .options(joinedload(TrainingResult.training_program).joinedload(TrainingProgram.cpr_guideline))
-             .options(joinedload(TrainingResult.users)))
+             .options(joinedload(TrainingResult.user)))
 
     if start_date:
         datetime_start_date = start_date_to_datetime(start_date)
@@ -532,7 +532,7 @@ async def get_trainings(page: int = 1, user_id: int = None, start_date: str = No
     offset = (page - 1) * per_page
     limit = page * per_page
 
-    query = (select(TrainingResult).options(joinedload(TrainingResult.users))
+    query = (select(TrainingResult).options(joinedload(TrainingResult.user))
              .options(joinedload(TrainingResult.training_program)))
     if user_id:
         query = query.where(TrainingResult.user_id == user_id)
@@ -557,7 +557,7 @@ async def get_trainings(page: int = 1, user_id: int = None, start_date: str = No
 
 @router.get("/{training_id}")
 async def get_training(training_id: int, db: Session = Depends(get_db)):
-    training_result = (db.query(TrainingResult).options(joinedload(TrainingResult.users))
+    training_result = (db.query(TrainingResult).options(joinedload(TrainingResult.user))
                        .options(joinedload(TrainingResult.training_program)).get(training_id))
     if not training_result:
         return None

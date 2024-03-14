@@ -24,8 +24,8 @@ def convert_to_schema(user: User):
                                          message='user not found',
                                          exception_type=ExceptionType.NOT_FOUND)
     role = RoleResponse(
-        id=user.users_role.id,
-        title=user.users_role.role
+        id=user.user_role.id,
+        title=user.user_role.role
     )
     return UserResponseSchema(
         email=user.email,
@@ -37,7 +37,7 @@ def convert_to_schema(user: User):
 
 
 def get_user_by_email(email, db: Session = Depends(get_db)):
-    query = select(User).options(joinedload(User.users_role)).where(email == User.email)
+    query = select(User).options(joinedload(User.user_role)).where(email == User.email)
     return db.scalar(query)
 
 
@@ -78,7 +78,7 @@ async def login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
 
 
 def check_admin_by_role(user):
-    if not user.users_role or user.users_role.role != 'administrator':
+    if not user.user_role or user.user_role.role != 'administrator':
         raise GetExceptionWithStatuscode(status.HTTP_401_UNAUTHORIZED,
                                          'login fail',
                                          ExceptionType.INVALID_PERMISSION)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "user"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), unique=True, index=True)
@@ -15,23 +15,23 @@ class User(Base):
     employee_id = Column(String(100))
     token = Column(String(100))
     token_expiration = Column(DATETIME)
-    users_role_id = Column(Integer, ForeignKey("users_role.id"))
+    user_role_id = Column(Integer, ForeignKey("user_role.id"))
     organization_id = Column(Integer, ForeignKey('organization.id'))
 
-    organization = relationship('Organization', back_populates='users')
-    users_role = relationship('UserRole', back_populates='users')
-    training_result = relationship('TrainingResult', back_populates='users')
-    trainings = relationship('Training', back_populates='users')
-    trainings_download_options = relationship('TrainingsDownloadOptions', back_populates='users')
+    organization = relationship('Organization', back_populates='user')
+    user_role = relationship('UserRole', back_populates='user')
+    training_result = relationship('TrainingResult', back_populates='user')
+    trainings = relationship('Training', back_populates='user')
+    trainings_download_options = relationship('TrainingsDownloadOptions', back_populates='user')
 
 
 class UserRole(Base):
-    __tablename__ = "users_role"
+    __tablename__ = "user_role"
 
     id = Column(Integer, primary_key=True, index=True)
     role = Column(String(50), unique=True)
 
-    users = relationship('User', back_populates="users_role")
+    user = relationship('User', back_populates="user_role")
 
 
 class Organization(Base):
@@ -40,7 +40,7 @@ class Organization(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_name = Column(String(200), unique=True)
 
-    users = relationship('User', back_populates='organization')
+    user = relationship('User', back_populates='organization')
     training_program = relationship('TrainingProgram', back_populates='organization')
     organization_content = relationship('OrganizationContent', back_populates='organization')
     certifications_template = relationship('CertificationsTemplate', back_populates='organization')
@@ -225,10 +225,10 @@ class TrainingResult(Base):
     data = Column(JSON)
     date = Column(DATETIME)
     score = Column(Integer)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("user.id"))
     training_program_id = Column(Integer, ForeignKey('training_program.id'))
 
-    users = relationship("User", back_populates="training_result")
+    user = relationship("User", back_populates="training_result")
     training_program = relationship("TrainingProgram", back_populates="training_result")
 
 
@@ -238,17 +238,17 @@ class Training(Base):
     id = Column(Integer, primary_key=True, index=True)
     training_date = Column(DATETIME)
     training_program_id = Column(Integer, ForeignKey("training_program.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("user.id"))
     score = Column(Integer)
 
-    users = relationship("User", back_populates="trainings")
+    user = relationship("User", back_populates="trainings")
     training_program = relationship("TrainingProgram", back_populates="trainings")
 
 
 class TrainingsDownloadOptions(Base):
     __tablename__ = "trainings_download_options"
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user.id'), primary_key=True, index=True)
     email = Column(BOOLEAN, default=True)
     score = Column(BOOLEAN, default=True)
     username = Column(BOOLEAN, default=True)
@@ -277,4 +277,4 @@ class TrainingsDownloadOptions(Base):
     device_id = Column(BOOLEAN, default=False)
     name = Column(BOOLEAN, default=False)
 
-    users = relationship('User', back_populates='trainings_download_options')
+    user = relationship('User', back_populates='trainings_download_options')
