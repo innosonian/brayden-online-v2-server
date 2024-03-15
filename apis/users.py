@@ -13,11 +13,11 @@ from sqlalchemy import select, or_, func, insert
 from bcrypt import hashpw
 
 from database import get_db
-from schema import UserCreateResponseSchema, UserCreateRequestSchema, UserUpdateRequestSchema
-
 from pandas import read_excel, DataFrame
 
 from boto3 import client
+
+from schema.users import GetListResponseSchema, CreateResponseSchema, CreateRequestSchema, UpdateRequestSchema
 
 router = APIRouter(prefix="/users")
 per_page = 10
@@ -33,8 +33,8 @@ def get_token_by_header(headers):
     return headers.get('Authorization')
 
 
-@router.post('', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponseSchema)
-async def create_user(request: Request, user: UserCreateRequestSchema, db: Session = Depends(get_db)):
+@router.post('', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+async def create_user(request: Request, user: CreateRequestSchema, db: Session = Depends(get_db)):
     db.expire_on_commit = False
     # get organization id by token
     organization_id = None
@@ -66,7 +66,7 @@ async def create_user(request: Request, user: UserCreateRequestSchema, db: Sessi
     def hashed_password(password: str):
         return hashpw(password.encode('utf-8'), salt)
 
-    #check user role exist if no value insert student
+    # check user role exist if no value insert student
     if user.user_role_id is None:
         user.user_role_id = 1
 
@@ -212,7 +212,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
             "failure_detail": url}
 
 
-@router.get('', status_code=status.HTTP_200_OK)
+@router.get('', status_code=status.HTTP_200_OK, response_model=GetListResponseSchema)
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
@@ -297,7 +297,7 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch('/{user_id}')
-async def update_user(request: Request, user_id: int, user_data: UserUpdateRequestSchema,
+async def update_user(request: Request, user_id: int, user_data: UpdateRequestSchema,
                       db: Session = Depends(get_db)):
     try:
         token = get_token_by_header(request.headers)
