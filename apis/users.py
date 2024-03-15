@@ -360,6 +360,9 @@ async def update_user(request: Request, user_id: int, user_data: UpdateRequestSc
         elif e.exception_type == ExceptionType.INVALID_PERMISSION:
             logging.error(e.message)
             raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'there is no user')
 
     result = dict()
     user = None
