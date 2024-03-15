@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 import regex
 from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile
@@ -241,6 +242,45 @@ async def get_users(page: int = 1, search_keyword: str = None, db: Session = Dep
     return get_users_by_search_keyword(search_keyword)
 
 
+@router.get('/me')
+async def get_my_information(request: Request, db: Session = Depends(get_db)):
+    try:
+        token = get_token_by_header(request.headers)
+        me = get_my_information_by_token(token, db)
+        return {
+            "token": me.token,
+            "email": me.email,
+            "name": me.name,
+            "role": {
+                "id": me.user_role.id,
+                "title": me.user_role.role
+            },
+            "last_training_date": "2023-12-11",
+            "certifications": {
+                "adult": {
+                    "expiration": "2023-11-23"
+                },
+                "child": {
+                    "expiration": None
+                },
+                "baby": {
+                    "expiration": "2025-11-23"
+                }
+            }
+        }
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
+    except GetException as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e.message)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, 'there is no user')
+
+
 @router.get('/{user_id}')
 async def get_user(user_id: int, db: Session = Depends(get_db)):
     # options(joinedload(User.training_result))
@@ -280,6 +320,15 @@ def get_user_by_token(token: str, db: Session = Depends(get_db)):
     user = db.scalar(select_user)
     if not user:
         raise GetException("invalid token", ExceptionType.NOT_FOUND)
+    return user
+
+
+def get_my_information_by_token(token: str, db: Session = Depends(get_db)):
+    user = get_user_by_token(token, db)
+    if user.token_expiration <= datetime.now():
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_403_FORBIDDEN,
+                                         message='token is expired',
+                                         exception_type=ExceptionType.INVALID_TOKEN)
     return user
 
 

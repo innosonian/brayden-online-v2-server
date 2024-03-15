@@ -11,7 +11,7 @@ from models import User
 
 router = APIRouter(prefix='/accounts')
 
-
+# TODO Deprecated api
 @router.get('')
 def get_my_account_info(request: Request, db: Session = Depends(get_db)):
     token = request.headers['Authorization']
@@ -25,8 +25,8 @@ def get_my_account_info(request: Request, db: Session = Depends(get_db)):
         "email": user.email,
         "name": user.name,
         "role": {
-            "id": user.users_role.id,
-            "title": user.users_role.role
+            "id": user.user_role.id,
+            "title": user.user_role.role
         },
         "last_training_date": "2023-12-11",
         "certifications": {
