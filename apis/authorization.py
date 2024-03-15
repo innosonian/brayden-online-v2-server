@@ -84,12 +84,22 @@ def check_admin_by_role(user):
                                          ExceptionType.INVALID_PERMISSION)
 
 
-@router.post('/login/admin', response_model=BaseResponseSchema)
+@router.post('/login/admin', response_model=UserResponseSchema)
 async def admin_login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
     try:
         user_by_email = get_user_by_email(login_data.email, db)
         user = validate_login_data(user_by_email, login_data.password)
         check_admin_by_role(user)
+
+        # insert token value
+        token = uuid1().__str__()
+        user.token = token
+        # 구체적인 토큰 유효기간 정책이 정해지지 않았으므로 긴 유효기간으로 설정
+        user.token_expiration = datetime.now() + timedelta(days=365 * 999)
+
+        db.add(user)
+        db.commit()
+        return convert_to_schema(user)
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_MATCHED:
             logging.error(e.message)
@@ -98,12 +108,4 @@ async def admin_login(login_data: LoginRequestSchema, db: Session = Depends(get_
             logging.error(e.message)
             raise HTTPException(e.status_code, detail=e.message)
 
-    # insert token value
-    token = uuid1().__str__()
-    user.token = token
-    # 구체적인 토큰 유효기간 정책이 정해지지 않았으므로 긴 유효기간으로 설정
-    user.token_expiration = datetime.now() + timedelta(days=365 * 999)
 
-    db.add(user)
-    db.commit()
-    return user

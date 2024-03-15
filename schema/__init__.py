@@ -1,2 +1,2 @@
-from .users import UserCreateResponseSchema, UserCreateRequestSchema, UserUpdateRequestSchema
+from .users import CreateResponseSchema, CreateRequestSchema, UpdateRequestSchema
 from .training_program import GetResponseSchema

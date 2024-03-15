@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from models.model import Training, TrainingProgram, User
+from pydantic import BaseModel
+from schema.cpr_guideline import ResponseSchema
 
 
 class TrainingBaseResponseSchema:
@@ -21,27 +23,56 @@ class TrainingBaseResponseSchema:
 
 
 class TrainingProgramResponseSchema:
-    title: str
-    manikin_type: str
     id: int
-    cpr_guideline: dict
+    title: str | None = None
+    manikin_type: str | None = None
+    # training_type: str | None = None
+    feedback_type: str | None = None
+    training_mode: str | None = None
+    duration: int | None = None
+    compression_limit: int | None = None
+    cycle_limit: int | None = None
+    ventilation_limit: int | None = None
+    cvr_compression: int | None = None
+    cvr_ventilation: int | None = None
+    compression_ventilation_ratio: str | None = None
+    cpr_guideline: ResponseSchema | None = None
 
     def __init__(self, training_program: TrainingProgram):
         self.id = training_program.id
         self.title = training_program.title
-        self.cpr_guideline = training_program.cpr_guideline
         self.manikin_type = training_program.manikin_type
+        self.feedback_type = training_program.feedback_type
+        self.training_mode = training_program.training_mode
+        self.duration = training_program.duration
+        self.compression_limit = training_program.compression_limit
+        self.cycle_limit = training_program.cycle_limit
+        self.ventilation_limit = training_program.ventilation_limit
+        self.cvr_compression = training_program.cvr_compression
+        self.cvr_ventilation = training_program.cvr_ventilation
+        self.compression_ventilation_ratio = \
+            f'{training_program.cvr_compression}:{training_program.cvr_ventilation}' if training_program.cvr_ventilation and training_program.cvr_compression else None
+        self.cpr_guideline = ResponseSchema(id=training_program.cpr_guideline.id,
+                                            title=training_program.cpr_guideline.title,
+                                            compression_depth=training_program.cpr_guideline.compression_depth,
+                                            ventilation_volume=training_program.cpr_guideline.ventilation_volume)
 
 
 class UserSchema:
+    id: int
     email: str
     name: str
     employee_id: str
+    organization_id: int
+    user_role_id: int
 
     def __init__(self, user: User):
+        self.id = user.id
         self.email = user.email
         self.name = user.name
         self.employee_id = user.employee_id
+        self.organization_id = user.organization_id
+        self.user_role_id = user.user_role_id
 
 
 class TrainingProgramDetailSchema(TrainingProgramResponseSchema):
