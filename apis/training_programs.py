@@ -123,13 +123,10 @@ async def update_training_program(request: Request, training_program_id: int, da
         training_program = check_exist_training_program(training_program_id, db)
         training_data = dict()
         # TODO 데이터 변환을 어떻게 하면 좋을지
-        if data.compression_ventilation_ratio:
-            cvr = data.compression_ventilation_ratio
-            split_cvr = cvr.split(':')
-            training_data['cvr_compression'] = split_cvr[0]
-            training_data['cvr_ventilation'] = split_cvr[1]
 
         training_data['title'] = training_program.title
+        training_data['cvr_compression'] = training_program.cvr_compression
+        training_data['cvr_ventilation'] = training_program.cvr_ventilation
         training_data['manikin_type'] = training_program.manikin_type
         training_data['cpr_guideline_id'] = training_program.cpr_guideline_id
         training_data['training_type'] = training_program.training_type
@@ -169,7 +166,7 @@ async def update_training_program(request: Request, training_program_id: int, da
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Internal Server Error')
 
 
-@router.delete('/{training_program_id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{training-program_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_program(request: Request, training_program_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
