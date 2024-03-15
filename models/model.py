@@ -211,7 +211,7 @@ class CertificationsTemplate(Base):
     def convert_to_schema(self):
         from schema.certifications_template import GetResponseSchema
         images_url = self.presigned_url
-        return GetResponseSchema(id=self.id, title=self.title, organization=self.organization, images=images_url,
+        return GetResponseSchema(id=self.id, title=self.title, organization_name=self.organization_name, images=images_url,
                                  manikin_type=self.manikin_type)
 
 

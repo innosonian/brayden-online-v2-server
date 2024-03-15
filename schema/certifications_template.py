@@ -14,7 +14,7 @@ class CertificationImages(BaseModel):
 class GetResponseSchema(BaseModel):
     id: int
     title: str
-    organization: str
+    organization_name: str
     manikin_type: str
     images: CertificationImages | None
 

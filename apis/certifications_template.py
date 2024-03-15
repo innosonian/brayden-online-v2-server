@@ -92,8 +92,8 @@ async def get_certifications_template(request: Request, manikin_type: str, db: S
 
     try:
         user = check_authorization(request, db)
-        query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.user)).where(
-            and_(User.id == user.id, CertificationsTemplate.manikin_type == manikin_type))
+        query = select(CertificationsTemplate).where(
+            and_(User.organization_id == user.organization_id, CertificationsTemplate.manikin_type == manikin_type))
         certification = db.scalar(query)
         if certification:
             return certification.convert_to_schema
@@ -124,8 +124,8 @@ async def update_certification_template(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
 
     title = request._form.get('title')
-    query = select(CertificationsTemplate).options(joinedload(CertificationsTemplate.user)).where(
-        and_(User.id == user.id, CertificationsTemplate.manikin_type == manikin_type))
+    query = select(CertificationsTemplate).where(
+        and_(User.organization_id == user.organization_id, CertificationsTemplate.manikin_type == manikin_type))
     certification = db.scalar(query)
     file_names = certification.images
 
@@ -179,9 +179,7 @@ async def update_certification_template(
             images_url[k] = get_presigned_url_from_upload_file(images_name[k])
         else:
             images_url[k] = None
-    return (CertificationsTemplate
-            (title=certification.title, organization=certification.organization, images=images_url,
-             manikin_type=certification.manikin_type))
+    return certification.convert_to_schema
 
 
 def replace_certificate_format_from_data(issued_certificate_format, template, user):
@@ -189,7 +187,7 @@ def replace_certificate_format_from_data(issued_certificate_format, template, us
         user_name = 'user_name'
         certification = 'certification_title'
         manikin_type = 'manikin_type'
-        organization = 'organization'
+        organization_name = 'organization_name'
         formatted_date = 'formatted_date'
 
     # assign certificate format to certification template, user data
@@ -199,7 +197,7 @@ def replace_certificate_format_from_data(issued_certificate_format, template, us
     for idx, str in enumerate([user.name,
                                template.title if template.title else "",
                                template.manikin_type,
-                               template.organization,
+                               template.organization_name,
                                '2023-12-20']):
         result = result.replace([e.value for e in DefaultTemplateIdentifier][idx], str)
     # get image url from s3
