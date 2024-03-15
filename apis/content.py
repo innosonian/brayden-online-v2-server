@@ -11,7 +11,7 @@ from boto3 import client
 
 from exceptions import GetExceptionWithStatuscode, ExceptionType
 from models.model import TrainingProgramContent, OrganizationContent, User
-from schema.content import CreateResponseSchema
+from schema.content import ContentCreateResponseSchema
 
 router = APIRouter(prefix='/contents')
 
@@ -95,8 +95,8 @@ def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
     return user
 
 
-@router.post('/training', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
-async def create_training_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
+@router.post('/training/{training_program_id}', status_code=status.HTTP_201_CREATED, response_model=ContentCreateResponseSchema)
+async def create_training_content(request: Request, content: UploadFile, training_program_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
         get_authorized_user_by_token(token, db)
@@ -115,7 +115,7 @@ async def create_training_content(request: Request, content: UploadFile, db: Ses
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='could not upload file')
 
     # db insert
-    training_content = TrainingProgramContent(s3_key=s3_key, file_name=content.filename)
+    training_content = TrainingProgramContent(s3_key=s3_key, file_name=content.filename, training_program_id=training_program_id)
     db.add(training_content)
     db.commit()
     db.refresh(training_content)
@@ -133,7 +133,7 @@ def check_exist_training_content(content_id: int, db: Session = Depends(get_db))
     return training_content
 
 
-@router.get('/training/{content_id}', response_model=CreateResponseSchema)
+@router.get('/training/{content_id}', response_model=ContentCreateResponseSchema)
 async def get_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
@@ -181,7 +181,7 @@ async def delete_training_content(request: Request, content_id: int, db: Session
 
 
 @router.post('/manikin_connected/{manikin_type}', status_code=status.HTTP_201_CREATED,
-             response_model=CreateResponseSchema)
+             response_model=ContentCreateResponseSchema)
 async def create_manikin_connected(request: Request, manikin_type: str, content: UploadFile,
                                    db: Session = Depends(get_db)):
     try:
@@ -273,7 +273,7 @@ async def delete_manikin_connected(request: Request, content_id: int, db: Sessio
         return
 
 
-@router.post('/login', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+@router.post('/login', status_code=status.HTTP_201_CREATED, response_model=ContentCreateResponseSchema)
 async def create_login_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)

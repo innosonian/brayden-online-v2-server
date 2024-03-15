@@ -55,6 +55,16 @@ class CPRGuideline(Base):
 
     training_program = relationship('TrainingProgram', back_populates='cpr_guideline')
 
+    @property
+    def convert_to_schema(self):
+        from schema.cpr_guideline import ResponseSchema
+        return ResponseSchema(
+            id=self.id,
+            title=self.title,
+            compression_depth=self.compression_depth,
+            ventilation_volume=self.ventilation_volume
+        )
+
 
 class TrainingProgram(Base):
     __tablename__ = "training_program"
@@ -115,8 +125,8 @@ class TrainingProgramContent(Base):
 
     @property
     def convert_to_schema(self):
-        from schema.content import CreateResponseSchema
-        return CreateResponseSchema(
+        from schema.content import ContentCreateResponseSchema
+        return ContentCreateResponseSchema(
             id=self.id,
             file_name=self.file_name,
             url=self.presigned_url
@@ -159,8 +169,8 @@ class OrganizationContent(Base):
 
     @property
     def convert_to_schema(self):
-        from schema.content import CreateResponseSchema
-        return CreateResponseSchema(
+        from schema.content import ContentCreateResponseSchema
+        return ContentCreateResponseSchema(
             id=self.id,
             file_name=self.file_name,
             url=self.presigned_url
