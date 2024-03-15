@@ -49,8 +49,7 @@ def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
 async def create_training_program(request: Request, data: CreateRequestSchema, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
-
+        user = get_authorized_user_by_token(token, db)
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.INVALID_PERMISSION:
             raise HTTPException(e.status_code, e.message)
@@ -59,6 +58,8 @@ async def create_training_program(request: Request, data: CreateRequestSchema, d
         elif e.exception_type == ExceptionType.INVALID_TOKEN:
             raise HTTPException(e.status_code, e.message)
         return
+
+    data.organization_id = user.organization_id
     training_program = data.convert_to_model
 
     db.add(training_program)

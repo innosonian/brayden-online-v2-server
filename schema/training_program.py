@@ -16,7 +16,7 @@ class CreateRequestSchema(BaseModel):
     ventilation_limit: int | None = None
     cvr_compression: int | None = None
     cvr_ventilation: int | None = None
-    organization_id: int
+    organization_id: int | None = None
     cpr_guideline_id: int
 
     @property
