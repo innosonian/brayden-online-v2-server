@@ -68,7 +68,8 @@ async def create_training_program(request: Request, data: CreateRequestSchema, d
 
 
 def convert_model_to_cpr_guideline(training_program: TrainingProgram):
-    return ResponseSchema(title=training_program.cpr_guideline.title,
+    return ResponseSchema(id=training_program.cpr_guideline.id,
+                          title=training_program.cpr_guideline.title,
                           compression_depth=training_program.cpr_guideline.compression_depth,
                           ventilation_volume=training_program.cpr_guideline.ventilation_volume)
 
