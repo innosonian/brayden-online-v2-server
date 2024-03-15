@@ -95,7 +95,7 @@ def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
     return user
 
 
-@router.post('/training-programs', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
+@router.post('/training', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
 async def create_training_content(request: Request, content: UploadFile, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
@@ -133,7 +133,7 @@ def check_exist_training_content(content_id: int, db: Session = Depends(get_db))
     return training_content
 
 
-@router.get('/training-programs/{content_id}', response_model=CreateResponseSchema)
+@router.get('/training/{content_id}', response_model=CreateResponseSchema)
 async def get_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
@@ -153,7 +153,7 @@ async def get_training_content(request: Request, content_id: int, db: Session = 
         return
 
 
-@router.delete('/training-programs/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/training/{content_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_content(request: Request, content_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)
