@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from models import TrainingProgram
+from schema.content import ContentCreateResponseSchema
 from schema.cpr_guideline import ResponseSchema
 
 
@@ -55,6 +56,12 @@ class CreateResponseSchema(BaseModel):
     cpr_guideline_id: int
 
 
+class CompressionVentilationRatioSchema(BaseModel):
+    title: str | None = None
+    cvr_compression: int | None = None
+    cvr_ventilation: int | None = None
+
+
 class GetResponseSchema(BaseModel):
     id: int
     title: str | None = None
@@ -66,9 +73,8 @@ class GetResponseSchema(BaseModel):
     compression_limit: int | None = None
     cycle_limit: int | None = None
     ventilation_limit: int | None = None
-    cvr_compression: int | None = None
-    cvr_ventilation: int | None = None
-    compression_ventilation_ratio: str | None = None
+    compression_ventilation_ratio: CompressionVentilationRatioSchema = None
+    training_content: ContentCreateResponseSchema | None = None
     cpr_guideline: ResponseSchema | None = None
 
 

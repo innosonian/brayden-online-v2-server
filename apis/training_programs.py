@@ -2,15 +2,17 @@ import logging
 
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.sql import select, and_, update
+from sqlalchemy import outerjoin
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import select, update
 
 from database import get_db
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models import TrainingProgram, User
-from schema.cpr_guideline import ResponseSchema
+from models import TrainingProgram, User, CPRGuideline
+from models.model import TrainingProgramContent
 
-from schema.training_program import CreateRequestSchema, CreateResponseSchema, GetResponseSchema, UpdateRequestSchema
+from schema.training_program import CreateRequestSchema, CreateResponseSchema, GetResponseSchema, UpdateRequestSchema, \
+    CompressionVentilationRatioSchema
 
 router = APIRouter(prefix='/training-programs')
 
@@ -68,14 +70,15 @@ async def create_training_program(request: Request, data: CreateRequestSchema, d
     return training_program
 
 
-def convert_model_to_cpr_guideline(training_program: TrainingProgram):
-    return ResponseSchema(id=training_program.cpr_guideline.id,
-                          title=training_program.cpr_guideline.title,
-                          compression_depth=training_program.cpr_guideline.compression_depth,
-                          ventilation_volume=training_program.cpr_guideline.ventilation_volume)
+def convert_model_to_ratio(training_program: TrainingProgram):
+    return CompressionVentilationRatioSchema(title=
+                                             f'{training_program.cvr_compression}:{training_program.cvr_ventilation}' if training_program.cvr_ventilation and training_program.cvr_compression else None,
+                                             cvr_compression=training_program.cvr_compression,
+                                             cvr_ventilation=training_program.cvr_ventilation)
 
 
-def convert_model_to_get_response_schema(training_program: TrainingProgram):
+def convert_model_to_get_response_schema(training_program: TrainingProgram, cpr_guideline: CPRGuideline,
+                                         content: TrainingProgramContent):
     return GetResponseSchema(
         id=training_program.id,
         title=training_program.title,
@@ -87,19 +90,20 @@ def convert_model_to_get_response_schema(training_program: TrainingProgram):
         compression_limit=training_program.compression_limit,
         cycle_limit=training_program.cycle_limit,
         ventilation_limit=training_program.ventilation_limit,
-        cvr_compression=training_program.cvr_compression,
-        cvr_ventilation=training_program.cvr_ventilation,
-        compression_ventilation_ratio=
-        f'{training_program.cvr_compression}:{training_program.cvr_ventilation}' if training_program.cvr_ventilation and training_program.cvr_compression else None,
-        cpr_guideline=convert_model_to_cpr_guideline(training_program)
+        compression_ventilation_ratio=convert_model_to_ratio(training_program),
+        training_content=content.convert_to_schema if content else None,
+        cpr_guideline=cpr_guideline.convert_to_schema if cpr_guideline else None
     )
 
 
 @router.get('', response_model=list[GetResponseSchema])
 async def get_training_programs(db: Session = Depends(get_db)):
-    query = select(TrainingProgram).options(joinedload(TrainingProgram.cpr_guideline))
-    training_programs = db.execute(query).scalars().all()
-    return [convert_model_to_get_response_schema(t) for t in training_programs]
+    training_programs = (db.query(TrainingProgram, CPRGuideline, TrainingProgramContent)
+                         .outerjoin(CPRGuideline, TrainingProgram.cpr_guideline_id == CPRGuideline.id)
+                         .outerjoin(TrainingProgramContent,
+                                    TrainingProgram.id == TrainingProgramContent.training_program_id)
+                         .all())
+    return [convert_model_to_get_response_schema(t, g, c) for t, g, c in training_programs]
 
 
 def check_exist_training_program(id: int, db: Session = Depends(get_db)):
