@@ -284,17 +284,17 @@ async def get_my_information(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/{user_id}')
 async def get_user(user_id: int, db: Session = Depends(get_db)):
-    query = select(Training).options(joinedload(Training.user)).order_by(Training.date.desc()).where(
-        Training.user_id == user_id)
-    user = db.execute(query.fetch(1)).scalar()
-    if not user:
+    result = (db.query(User, Training).outerjoin(Training, User.id == Training.user_id)
+              .filter(User.id == user_id).order_by(Training.date.desc()).first())
+    if not result:
         return None
+    user, training = result
 
     return {
-        "name": user.user.name,
-        "email": user.user.email,
-        "employee_id": user.user.employee_id,
-        "last_training_date": user.date,
+        "name": user.name,
+        "email": user.email,
+        "employee_id": user.employee_id,
+        "last_training_date": training.date if training else None,
         "certifications": {
             "adult": {
                 "expiration": "2023-11-23"
