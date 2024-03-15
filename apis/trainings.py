@@ -530,7 +530,6 @@ def end_date_to_datetime(end_date):
 async def get_trainings(page: int = 1, user_id: int = None, start_date: str = None, end_date: str = None,
                         db: Session = Depends(get_db)):
     offset = (page - 1) * per_page
-    limit = page * per_page
 
     query = (select(Training).options(joinedload(Training.user))
              .options(joinedload(Training.training_program)))
@@ -546,7 +545,7 @@ async def get_trainings(page: int = 1, user_id: int = None, start_date: str = No
 
     filtered_data_count = db.scalar(select(func.count('*')).select_from(query))
 
-    query = query.offset(offset).limit(limit).order_by(Training.id.desc())
+    query = query.offset(offset).fetch(per_page).order_by(Training.id.desc())
     training_data = db.scalars(query).all()
     result = []
     for t in training_data:
