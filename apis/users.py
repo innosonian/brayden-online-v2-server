@@ -6,7 +6,7 @@ import regex
 from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile
 
 from exceptions import GetException, ExceptionType, GetExceptionWithStatuscode
-from models.model import User
+from models.model import User, Training
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, or_, func, insert
@@ -18,7 +18,8 @@ from pandas import read_excel, DataFrame
 
 from boto3 import client
 
-from schema.users import GetListResponseSchema, CreateResponseSchema, CreateRequestSchema, UpdateRequestSchema
+from schema.users import GetListResponseSchema, CreateResponseSchema, CreateRequestSchema, UpdateRequestSchema, \
+    GetResponseSchema
 
 router = APIRouter(prefix="/users")
 per_page = 10
@@ -283,34 +284,29 @@ async def get_my_information(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/{user_id}')
 async def get_user(user_id: int, db: Session = Depends(get_db)):
-    # options(joinedload(User.training_result))
-    query = select(User).where(User.id == user_id)
-    user = db.execute(query).scalar()
+    query = select(Training).options(joinedload(Training.user)).order_by(Training.date.desc()).where(
+        Training.user_id == user_id)
+    user = db.execute(query.fetch(1)).scalar()
     if not user:
         return None
 
-    return user
-    # if user.training_result:
-    #     date = user.training_result.pop().date
-    # else:
-    #     date = None
-    # return {
-    #     "name": user.name,
-    #     "email": user.email,
-    #     "employee_id": user.employee_id,
-    #     "last_training_date": date,
-    #     "certifications": {
-    #         "adult": {
-    #             "expiration": "2023-11-23"
-    #         },
-    #         "child": {
-    #             "expiration": None
-    #         },
-    #         "baby": {
-    #             "expiration": "2025-11-23"
-    #         }
-    #     }
-    # }
+    return {
+        "name": user.user.name,
+        "email": user.user.email,
+        "employee_id": user.user.employee_id,
+        "last_training_date": user.date,
+        "certifications": {
+            "adult": {
+                "expiration": "2023-11-23"
+            },
+            "child": {
+                "expiration": None
+            },
+            "baby": {
+                "expiration": "2025-11-23"
+            }
+        }
+    }
 
 
 def get_user_by_token(token: str, db: Session = Depends(get_db)):
@@ -345,7 +341,7 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
-@router.patch('/{user_id}')
+@router.patch('/{user_id}', response_model=GetResponseSchema)
 async def update_user(request: Request, user_id: int, user_data: UpdateRequestSchema,
                       db: Session = Depends(get_db)):
     try:
