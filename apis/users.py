@@ -218,8 +218,8 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
-            query = select(User).order_by(User.id.desc()).offset(offset).fetch(per_page)
-            users = db.execute(query).scalars().all()
+            query = select(User).order_by(User.id.desc())
+            users = db.execute(query.offset(offset).fetch(per_page)).scalars().all()
             return users, query
 
         def filtered_users(search_keyword, offset: int = 0):
