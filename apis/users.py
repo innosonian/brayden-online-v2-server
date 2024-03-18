@@ -1,5 +1,6 @@
 import logging
 import os
+from io import BytesIO
 from datetime import datetime
 
 import regex
@@ -156,7 +157,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
     organization_id = me.organization_id
 
-    users = read_excel(file.file.read())
+    users = read_excel(BytesIO(file.file.read()), engine='openpyxl')
     failure_users = DataFrame()
     failure_count = 0
     success_count = 0
