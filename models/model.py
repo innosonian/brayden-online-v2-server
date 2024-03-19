@@ -94,8 +94,8 @@ class TrainingProgramContent(Base):
     __tablename__ = "training_program_content"
 
     id = Column(Integer, primary_key=True, index=True)
-    s3_key = Column(String(100))
-    file_name = Column(String(100))
+    s3_key = Column(String(300))
+    file_name = Column(String(300))
     training_program_id = Column(Integer, ForeignKey('training_program.id'))
 
     training_program = relationship('TrainingProgram', back_populates='training_program_content')
@@ -137,8 +137,8 @@ class OrganizationContent(Base):
     __tablename__ = 'organization_content'
 
     id = Column(Integer, primary_key=True, index=True)
-    s3_key = Column(String(100))
-    file_name = Column(String(100))
+    s3_key = Column(String(300))
+    file_name = Column(String(300))
     content_type = Column(String(50))
     organization_id = Column(Integer, ForeignKey('organization.id'))
 
