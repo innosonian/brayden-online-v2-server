@@ -320,11 +320,11 @@ def choose_training_data_from_options(training_data: list, option: TrainingsDown
         result_data = {}
         # TODO 쓸데없이 고정 데이터 넣은거 제거
         if option.email:
-            result_data['email'] = data.users.email
+            result_data['email'] = data.user.email
         if option.datetime:
             result_data['datetime'] = data.date
         if option.username:
-            result_data['username'] = data.users.name
+            result_data['username'] = data.user.name
         if option.score:
             result_data['score'] = data.score
         if option.overall_ccf:
