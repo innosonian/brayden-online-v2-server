@@ -170,7 +170,7 @@ async def update_training_program(request: Request, training_program_id: int, da
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Internal Server Error')
 
 
-@router.delete('/{training-program_id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{training_program_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_program(request: Request, training_program_id: int, db: Session = Depends(get_db)):
     try:
         token = check_exist_token(request)

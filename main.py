@@ -20,6 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(api.api_router)
+app.router.redirect_slashes = False
 
 
 @app.get("/")
@@ -50,5 +51,3 @@ async def create_cpr_guideline(data: dict, db: Session = Depends(get_db)):
 @app.get("/cpr_guidelines")
 async def get_cpr_guidelines(db: Session = Depends(get_db)):
     return db.query(CPRGuideline).all()
-
-

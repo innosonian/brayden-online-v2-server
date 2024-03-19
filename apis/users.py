@@ -1,5 +1,6 @@
 import logging
 import os
+from io import BytesIO
 from datetime import datetime
 
 import regex
@@ -156,7 +157,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
     organization_id = me.organization_id
 
-    users = read_excel(file.file.read())
+    users = read_excel(BytesIO(file.file.read()), engine='openpyxl')
     failure_users = DataFrame()
     failure_count = 0
     success_count = 0
@@ -218,8 +219,8 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
-            query = select(User).order_by(User.id.desc()).offset(offset).fetch(per_page)
-            users = db.execute(query).scalars().all()
+            query = select(User).order_by(User.id.desc())
+            users = db.execute(query.offset(offset).fetch(per_page)).scalars().all()
             return users, query
 
         def filtered_users(search_keyword, offset: int = 0):
@@ -284,17 +285,17 @@ async def get_my_information(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/{user_id}')
 async def get_user(user_id: int, db: Session = Depends(get_db)):
-    query = select(Training).options(joinedload(Training.user)).order_by(Training.date.desc()).where(
-        Training.user_id == user_id)
-    user = db.execute(query.fetch(1)).scalar()
-    if not user:
+    result = (db.query(User, Training).outerjoin(Training, User.id == Training.user_id)
+              .filter(User.id == user_id).order_by(Training.date.desc()).first())
+    if not result:
         return None
+    user, training = result
 
     return {
-        "name": user.user.name,
-        "email": user.user.email,
-        "employee_id": user.user.employee_id,
-        "last_training_date": user.date,
+        "name": user.name,
+        "email": user.email,
+        "employee_id": user.employee_id,
+        "last_training_date": training.date if training else None,
         "certifications": {
             "adult": {
                 "expiration": "2023-11-23"
