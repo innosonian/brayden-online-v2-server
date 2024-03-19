@@ -1,8 +1,11 @@
+import os
+
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "mysql+mysqldb://admin:1GwqmVmnlcAbsvyXgmx6@brayden-online-v2-db.cf2keyie6vkl.ap-northeast-2.rds.amazonaws.com:3306/brayden_online_v2_db_test1"
+
+SQLALCHEMY_DATABASE_URL = os.getenv('DB_URL')
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
