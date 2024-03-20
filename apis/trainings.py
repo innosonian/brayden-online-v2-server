@@ -17,7 +17,7 @@ from pandas import DataFrame, Timestamp
 
 from database import get_db
 from models import User, TrainingProgram
-from models.model import Training, TrainingsDownloadOptions
+from models.model import Training, TrainingsDownloadOptions, Certification
 from schema.trainings import TrainingResultResponseSchema, TrainingListSchema, TrainingResponseSchema
 
 router = APIRouter(prefix='/trainings')
@@ -51,6 +51,19 @@ def is_training(training_mode: str):
         return True
 
     return False
+
+
+def store_issued_certificate_information(training_id: int, user_id: int, db: Session = Depends(get_db)):
+    certification = Certification(user_id=user_id, training_id=training_id)
+    db.add(certification)
+    db.commit()
+    db.refresh(certification)
+    return certification
+
+
+# TODO issue certificate send email
+def issue_certificate():
+    pass
 
 
 @router.post('', status_code=status.HTTP_201_CREATED)
@@ -91,7 +104,6 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
 
     # extract score
     total_score = response_data['ResultByCycle']['ScoreByCycle']['Overall']
-
     # process calculate data
     training_result_data = dict()
     training_result_data['guide_prompt'] = response_data['Guide_prompts']
@@ -238,9 +250,12 @@ async def create_training(request: Request, training_data: CreateRequestSchema =
     db.add(trainings)
     db.commit()
     db.refresh(trainings)
-
+    if training_program.training_mode == 'assessment' and response_data['ResultSummary']['JudgResult'] == 'Pass':
+        issue_certificate()
+        store_issued_certificate_information(trainings.id, user.id, db)
     query = (select(Training).where(Training.id == trainings.id)
              .options(joinedload(Training.user)).options(joinedload(Training.training_program)))
+
     training_result = db.scalar(query)
     return TrainingResultResponseSchema(training_result)
 

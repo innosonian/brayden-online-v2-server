@@ -217,6 +217,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
 @router.get('', status_code=status.HTTP_200_OK, response_model=GetListResponseSchema)
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
+    #TODO 조직에 따라서 유저 정보 필터 필요
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
             query = select(User).order_by(User.id.desc())
