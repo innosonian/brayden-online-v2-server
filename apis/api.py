@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from . import users, authorization, training_programs, content, certifications_template, trainings, accounts
+from . import users, authorization, training_programs, content, certifications_template, trainings, accounts, \
+    certification
 
 api_router = APIRouter()
 
@@ -11,3 +12,4 @@ api_router.include_router(content.router, tags=["content"])
 api_router.include_router(certifications_template.router, tags=["certification_template"])
 api_router.include_router(trainings.router, tags=["trainings"])
 api_router.include_router(accounts.router, tags=["accounts"])
+api_router.include_router(certification.router, tags=["certification"])
