@@ -1,16 +1,16 @@
 import logging
 import os
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import regex
 from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile
 
 from exceptions import GetException, ExceptionType, GetExceptionWithStatuscode
-from models.model import User, Training
+from models.model import User, Training, Certification, TrainingProgram, Organization
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, or_, func, insert
+from sqlalchemy import select, or_, func, insert, and_
 
 from bcrypt import hashpw
 
@@ -217,7 +217,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
 @router.get('', status_code=status.HTTP_200_OK, response_model=GetListResponseSchema)
 async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
-    #TODO 조직에 따라서 유저 정보 필터 필요
+    # TODO 조직에 따라서 유저 정보 필터 필요
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
             query = select(User).order_by(User.id.desc())
@@ -284,31 +284,65 @@ async def get_my_information(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(status.HTTP_404_NOT_FOUND, 'there is no user')
 
 
-@router.get('/{user_id}')
-async def get_user(user_id: int, db: Session = Depends(get_db)):
-    result = (db.query(User, Training).outerjoin(Training, User.id == Training.user_id)
-              .filter(User.id == user_id).order_by(Training.date.desc()).first())
-    if not result:
-        return None
-    user, training = result
+def check_permission(me, user_id, db: Session = Depends(get_db)):
+    check_same_organization(user_id, me.organization_id, db)
+    check_has_permission(me, user_id, db)
 
-    return {
-        "name": user.name,
-        "email": user.email,
-        "employee_id": user.employee_id,
-        "last_training_date": training.date if training else None,
-        "certifications": {
-            "adult": {
-                "expiration": "2023-11-23"
-            },
-            "child": {
-                "expiration": None
-            },
-            "baby": {
-                "expiration": "2025-11-23"
-            }
+
+def check_has_permission(me, user_id, db: Session = Depends(get_db)):
+    query = select(User).where(and_(User.id == user_id, User.organization_id == me.organization_id))
+    user = db.execute(query).scalar()
+    if user.user_role_id > me.user_role_id:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
+                                         message='invalid permission',
+                                         exception_type=ExceptionType.INVALID_PERMISSION)
+
+
+@router.get('/{user_id}')
+async def get_user(request: Request, user_id: int, db: Session = Depends(get_db)):
+    try:
+        token = get_token_by_header(request.headers)
+        me = get_my_information_by_token(token, db)
+        check_permission(me, user_id, db)
+
+        result_list = (
+            db.query(User, Training, Certification, TrainingProgram).outerjoin(Training, User.id == Training.user_id)
+            .outerjoin(Certification, User.id == Certification.user_id)
+            .outerjoin(TrainingProgram, TrainingProgram.id == Training.training_program_id)
+            .filter(User.id == user_id).order_by(Training.date.desc()))
+        if not result_list:
+            return None
+        # recent training history
+        user, training, certification, training_program = result_list[0]
+        # check certification expired date
+        certificate = {'adult': {'expiration': None}, 'child': {'expiration': None}, 'baby': {'expiration': None}}
+        for i, result in enumerate(result_list):
+            u, t, c, tp = result
+            # check manikin type
+            if tp and certificate[tp.manikin_type]['expiration'] is None:
+                certificate[tp.manikin_type] = {"expiration": c.issued_date + timedelta(days=365)}
+        # TODO compare expiration date to current date
+
+        return {
+            "name": user.name,
+            "email": user.email,
+            "employee_id": user.employee_id,
+            "last_training_date": training.date if training else None,
+            "certifications": certificate
         }
-    }
+    except GetExceptionWithStatuscode as e:
+        if e.exception_type == ExceptionType.INVALID_TOKEN:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
+        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
+        elif e.exception_type == ExceptionType.NOT_FOUND:
+            logging.error(e.message)
+            raise HTTPException(e.status_code, detail=e.message)
+    except GetException as e:
+        if e.exception_type == ExceptionType.NOT_FOUND:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail='there is no user')
 
 
 def get_user_by_token(token: str, db: Session = Depends(get_db)):
@@ -319,6 +353,15 @@ def get_user_by_token(token: str, db: Session = Depends(get_db)):
     if not user:
         raise GetException("invalid token", ExceptionType.NOT_FOUND)
     return user
+
+
+def check_same_organization(user_id, organization_id, db: Session = Depends(get_db)):
+    query = select(User).where(and_(User.id == user_id, User.organization_id == organization_id))
+    user = db.execute(query).scalar()
+    if not user:
+        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
+                                         message='invalid permission',
+                                         exception_type=ExceptionType.INVALID_PERMISSION)
 
 
 def get_my_information_by_token(token: str, db: Session = Depends(get_db)):
