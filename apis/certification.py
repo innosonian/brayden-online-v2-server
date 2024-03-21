@@ -27,13 +27,15 @@ def save_certification(issued_certification):
         f.write(issued_certification)
 
 
-def get_certification_template_by_manikin_type(db, manikin_type):
+def get_certification_template_by_manikin_type(manikin_type, organization_id, db):
     # get certification template data
-    query = select(CertificationsTemplate).where(CertificationsTemplate.manikin_type == manikin_type)
+    query = (select(CertificationsTemplate)
+             .where(and_(CertificationsTemplate.manikin_type == manikin_type,
+                         CertificationsTemplate.organization_id == organization_id)))
     template = db.scalar(query)
     if not template:
         raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
-                                         message="there is no user",
+                                         message="there is certifications template",
                                          exception_type=ExceptionType.NOT_FOUND)
     return template
 
@@ -144,7 +146,7 @@ def get_user_by_id(user_id: int, manikin_type: str, db: Session = Depends(get_db
 def get_issued_certificate(user_id: int, manikin_type: str = 'adult', db: Session = Depends(get_db)):
     try:
         user = get_user_by_id(user_id, manikin_type, db)
-        template = get_certification_template_by_manikin_type(db, manikin_type)
+        template = get_certification_template_by_manikin_type(manikin_type, user.organization_id, db)
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             logging.error(e)
