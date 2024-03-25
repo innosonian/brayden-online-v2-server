@@ -11,6 +11,7 @@ from models.model import User, Training
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, or_, func, insert
+from sqlalchemy.exc import IntegrityError
 
 from bcrypt import hashpw
 
@@ -132,6 +133,33 @@ def get_presigned_url_from_upload_file(filename):
     return s3.generate_presigned_url('get_object', Params={'Bucket': BUCKET_NAME, 'Key': filename}, ExpiresIn=3600)
 
 
+def insert_each_user(users, organization_id, db: Session = Depends(get_db)):
+    failure_count = 0
+    failure_users = DataFrame()
+    for i, r in users.iterrows():
+        user = {}
+        # DB에 있는 이메일과 중복되는지 확인 -> 폐기
+        try:
+            row_to_dict = r.to_dict()
+            password_hashed = hashpw(row_to_dict['password'].encode('utf-8'), salt)
+            for key, value in row_to_dict.items():
+                if key == 'password':
+                    user['password_hashed'] = password_hashed
+                    user['organization_id'] = organization_id
+                    user['user_role_id'] = 1
+                    continue
+                user[key] = value
+            db.execute(insert(User).values(user))
+            db.commit()
+        except IntegrityError as e:
+            logging.error(e)
+            failure_count += 1
+            db.rollback()
+            r['reason'] = 'email duplicated'
+            failure_users = failure_users._append(r, ignore_index=True)
+    return failure_count, failure_users
+
+
 @router.post('/upload')
 async def user_upload(request: Request, file: UploadFile, db: Session = Depends(get_db)):
     file_name = 'user_upload_fail_with_reason.xlsx'
@@ -157,43 +185,26 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
     organization_id = me.organization_id
 
-    users = read_excel(BytesIO(file.file.read()), engine='openpyxl')
+    df = read_excel(BytesIO(file.file.read()), engine='openpyxl')
     failure_users = DataFrame()
     failure_count = 0
-    success_count = 0
-    # 삽입
-    for i, r in users.iterrows():
-        user = {}
-        # DB에 있는 이메일과 중복되는지 확인
-        # TODO bulk로 넣고 실패한 걸 체크하는 방향으로 가야함.
-        if db.scalar(select(User).where(User.email == r['email'])):
-            failure_count += 1
-            r['reason'] = 'email duplicated'
-            failure_users = failure_users._append(r, ignore_index=True)
-            continue
-        if not validate_email(r['email']):
-            failure_count += 1
-            r['reason'] = 'email invalid'
-            failure_users = failure_users._append(r, ignore_index=True)
-            continue
-
-        for k, v in r.items():
-            if k == 'password':
-                v = hashpw(v.encode('utf-8'), salt).decode('utf-8')
-                k = "password_hashed"
-                user['organization_id'] = organization_id
-            user[k] = v
-
-        ret = db.execute(insert(User).values(user))
-        if ret.rowcount == 1:
-            success_count += 1
-        else:
-            failure_count += 1
-            r['reason'] = 'insert fail'
-            failure_users = failure_users._append(r, ignore_index=True)
-
+    users = df.to_dict('records')
+    success_count = users.__len__()
+    try:
+        return_users = db.scalars(insert(User).returning(User), users)
+        # return_users = return_users.all()
+        db.commit()
+    except IntegrityError as e:
+        # 중복 오류 발생
+        logging.error(e)
+        db.rollback()
+        failure_count, failure_users = insert_each_user(df, organization_id, db)
+        success_count = success_count - failure_count
+    except Exception as e:
+        print(e.__dict__)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR)
     def make_excel_data_from_dataframe(failure_users, file_name):
-        failure_users.to_excel(file_name)
+        failure_users.to_excel(file_name, index=False)
 
     # 실패 사유가 담긴 파일 만들기
     url = None
@@ -209,7 +220,6 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
                 url = get_presigned_url_from_upload_file(f.name)
         # 생성한 파일 삭제
         os.remove(file_name)
-    db.commit()
 
     return {"success_count": success_count, "failure_count": failure_count,
             "failure_detail": url}
