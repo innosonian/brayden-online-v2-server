@@ -27,6 +27,7 @@ router = APIRouter(prefix="/users")
 per_page = 10
 salt = b'$2b$12$apcpayF3r/A/kKo2dlRk8O'
 BUCKET_NAME = 'brayden-online-v2-api-storage'
+STUDENT = 1
 
 
 def get_token_by_header(headers):
@@ -73,7 +74,7 @@ async def create_user(request: Request, user: CreateRequestSchema, db: Session =
 
     # check user role exist if no value insert student
     if user.user_role_id is None:
-        user.user_role_id = 1
+        user.user_role_id = STUDENT
 
     password_hashed = hashed_data(user.password).decode('utf-8')
     insert_user = User(email=user.email, name=user.name, password_hashed=password_hashed, employee_id=user.employee_id,
@@ -146,7 +147,7 @@ def insert_each_user(users, organization_id, db: Session = Depends(get_db)):
                 if key == 'password':
                     user['password_hashed'] = password_hashed
                     user['organization_id'] = organization_id
-                    user['user_role_id'] = 1
+                    user['user_role_id'] = STUDENT
                     continue
                 user[key] = value
             db.execute(insert(User).values(user))
