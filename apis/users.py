@@ -37,6 +37,10 @@ def get_token_by_header(headers):
     return headers.get('Authorization')
 
 
+def hashed_data(password: str):
+    return hashpw(password.encode('utf-8'), salt)
+
+
 @router.post('', status_code=status.HTTP_201_CREATED, response_model=CreateResponseSchema)
 async def create_user(request: Request, user: CreateRequestSchema, db: Session = Depends(get_db)):
     db.expire_on_commit = False
@@ -67,14 +71,11 @@ async def create_user(request: Request, user: CreateRequestSchema, db: Session =
     if check_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email duplicate")
 
-    def hashed_password(password: str):
-        return hashpw(password.encode('utf-8'), salt)
-
     # check user role exist if no value insert student
     if user.user_role_id is None:
         user.user_role_id = 1
 
-    password_hashed = hashed_password(user.password).decode('utf-8')
+    password_hashed = hashed_data(user.password).decode('utf-8')
     insert_user = User(email=user.email, name=user.name, password_hashed=password_hashed, employee_id=user.employee_id,
                        user_role_id=user.user_role_id, organization_id=organization_id)
     db.add(insert_user)
@@ -138,10 +139,9 @@ def insert_each_user(users, organization_id, db: Session = Depends(get_db)):
     failure_users = DataFrame()
     for i, r in users.iterrows():
         user = {}
-        # DB에 있는 이메일과 중복되는지 확인 -> 폐기
         try:
             row_to_dict = r.to_dict()
-            password_hashed = hashpw(row_to_dict['password'].encode('utf-8'), salt)
+            password_hashed = hashed_data(row_to_dict['password']).decode('utf-8')
             for key, value in row_to_dict.items():
                 if key == 'password':
                     user['password_hashed'] = password_hashed
@@ -203,6 +203,7 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
     except Exception as e:
         print(e.__dict__)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def make_excel_data_from_dataframe(failure_users, file_name):
         failure_users.to_excel(file_name, index=False)
 
