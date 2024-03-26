@@ -201,7 +201,6 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
 @router.get('', status_code=status.HTTP_200_OK, response_model=GetListResponseSchema)
 async def get_users(request: Request, page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
-    # TODO 조직에 따라서 유저 정보 필터 필요
     organization_id = None
     try:
         token = get_token_by_header(request)
