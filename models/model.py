@@ -1,6 +1,6 @@
 from database import Base
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DATETIME, BOOLEAN
+from sqlalchemy import Column, Integer, String, ForeignKey, DATETIME, BOOLEAN, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,7 @@ class User(Base):
     user_role = relationship('UserRole', back_populates='user')
     training = relationship('Training', back_populates='user')
     trainings_download_options = relationship('TrainingsDownloadOptions', back_populates='user')
+    certification = relationship('Certification', back_populates='user')
 
 
 class UserRole(Base):
@@ -221,7 +222,9 @@ class CertificationsTemplate(Base):
     def convert_to_schema(self):
         from schema.certifications_template import GetResponseSchema
         images_url = self.presigned_url
-        return GetResponseSchema(id=self.id, title=self.title, organization_name=self.organization_name, images=images_url,
+        return GetResponseSchema(id=self.id, title=self.title,
+                                 organization_name=self.organization_name,
+                                 images=images_url,
                                  manikin_type=self.manikin_type)
 
 
@@ -238,6 +241,19 @@ class Training(Base):
 
     user = relationship("User", back_populates="training")
     training_program = relationship("TrainingProgram", back_populates="training")
+    certification = relationship('Certification', back_populates='training')
+
+
+class Certification(Base):
+    __tablename__ = 'certification'
+
+    id = Column(Integer, primary_key=True, index=True)
+    issued_date = Column(DATETIME, server_default=func.now())
+    user_id = Column(Integer, ForeignKey('user.id'))
+    training_id = Column(Integer, ForeignKey('training.id'))
+
+    user = relationship('User', back_populates='certification')
+    training = relationship('Training', back_populates='certification')
 
 
 class TrainingsDownloadOptions(Base):
