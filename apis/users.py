@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import regex
 from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile
 
+from apis.util import get_token_by_header, STUDENT, get_user_by_token, check_authorized_by_user
 from exceptions import GetException, ExceptionType, GetExceptionWithStatuscode
 from models.model import User, Training, Certification, TrainingProgram, Organization
 
@@ -27,15 +28,6 @@ router = APIRouter(prefix="/users")
 per_page = 10
 salt = b'$2b$12$apcpayF3r/A/kKo2dlRk8O'
 BUCKET_NAME = 'brayden-online-v2-api-storage'
-STUDENT = 1
-
-
-def get_token_by_header(headers):
-    if 'Authorization' not in headers:
-        raise GetExceptionWithStatuscode(status.HTTP_401_UNAUTHORIZED,
-                                         'there is no token',
-                                         ExceptionType.INVALID_TOKEN)
-    return headers.get('Authorization')
 
 
 def hashed_data(password: str):
@@ -48,7 +40,7 @@ async def create_user(request: Request, user: CreateRequestSchema, db: Session =
     # get organization id by token
     organization_id = None
     try:
-        token = get_token_by_header(request.headers)
+        token = get_token_by_header(request)
         me = get_user_by_token(token, db)
         organization_id = me.organization_id
     except GetExceptionWithStatuscode as e:
@@ -165,7 +157,7 @@ def insert_each_user(users, organization_id, db: Session = Depends(get_db)):
 async def user_upload(request: Request, file: UploadFile, db: Session = Depends(get_db)):
     file_name = 'user_upload_fail_with_reason.xlsx'
     try:
-        token = get_token_by_header(request.headers)
+        token = get_token_by_header(request)
         me = get_user_by_token(token, db)
         validate_file_extension(file.filename)
         validate_file_format(file)
@@ -260,7 +252,7 @@ async def get_users(page: int = 1, search_keyword: str = None, db: Session = Dep
 @router.get('/me')
 async def get_my_information(request: Request, db: Session = Depends(get_db)):
     try:
-        token = get_token_by_header(request.headers)
+        token = get_token_by_header(request)
         me = get_my_information_by_token(token, db)
         return {
             "token": me.token,
@@ -313,7 +305,7 @@ def check_has_permission(me, user_id, db: Session = Depends(get_db)):
 @router.get('/{user_id}')
 async def get_user(request: Request, user_id: int, db: Session = Depends(get_db)):
     try:
-        token = get_token_by_header(request.headers)
+        token = get_token_by_header(request)
         me = get_my_information_by_token(token, db)
         check_permission(me, user_id, db)
 
@@ -343,28 +335,11 @@ async def get_user(request: Request, user_id: int, db: Session = Depends(get_db)
             "certifications": certificate
         }
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(e.status_code, detail=e.message)
-        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
-            logging.error(e.message)
-            raise HTTPException(e.status_code, detail=e.message)
-        elif e.exception_type == ExceptionType.NOT_FOUND:
-            logging.error(e.message)
-            raise HTTPException(e.status_code, detail=e.message)
+        logging.error(e.message)
+        raise HTTPException(e.status_code, detail=e.message)
     except GetException as e:
         if e.exception_type == ExceptionType.NOT_FOUND:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail='there is no user')
-
-
-def get_user_by_token(token: str, db: Session = Depends(get_db)):
-    if not token:
-        raise GetException('invalid token', ExceptionType.INVALID_TOKEN)
-    select_user = select(User).options(joinedload(User.user_role)).where(User.token == token)
-    user = db.scalar(select_user)
-    if not user:
-        raise GetException("invalid token", ExceptionType.NOT_FOUND)
-    return user
 
 
 def check_same_organization(user_id, organization_id, db: Session = Depends(get_db)):
@@ -385,11 +360,6 @@ def get_my_information_by_token(token: str, db: Session = Depends(get_db)):
     return user
 
 
-def check_user_permission(user: User):
-    if user.user_role.role != 'administrator':
-        raise GetException('invalid token', ExceptionType.INVALID_PERMISSION)
-
-
 def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     # get update user data
     user = db.query(User).get(user_id)
@@ -402,24 +372,14 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 async def update_user(request: Request, user_id: int, user_data: UpdateRequestSchema,
                       db: Session = Depends(get_db)):
     try:
-        token = get_token_by_header(request.headers)
+        token = get_token_by_header(request)
         me = get_user_by_token(token, db)
         # check user_id me id
         if me.id != user_id:
-            check_user_permission(me)
+            check_authorized_by_user(me)
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            raise HTTPException(e.status_code, e.message)
-    except GetException as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
-        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
-        elif e.exception_type == ExceptionType.NOT_FOUND:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_403_FORBIDDEN, 'there is no user')
+        logging.error(e)
+        raise HTTPException(e.status_code, detail=e.message)
 
     result = dict()
     user = None
