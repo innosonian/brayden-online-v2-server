@@ -12,15 +12,6 @@ ADMIN = 3
 STUDENT = 1
 
 
-def check_user_permission(user: User):
-    if user.user_role.id == STUDENT:
-        raise GetExceptionWithStatuscode(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            message='invalid token',
-            exception_type=ExceptionType.INVALID_PERMISSION
-        )
-
-
 def get_token_by_header(request: Request):
     headers = request.headers
     if AUTHORIZATION not in headers:
