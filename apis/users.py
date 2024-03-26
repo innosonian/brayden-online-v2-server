@@ -42,21 +42,11 @@ async def create_user(request: Request, user: CreateRequestSchema, db: Session =
     try:
         token = get_token_by_header(request)
         me = get_user_by_token(token, db)
+        check_authorized_by_user(me)
         organization_id = me.organization_id
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(e.status_code, detail=e.message)
-    except GetException as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
-        elif e.exception_type == ExceptionType.INVALID_PERMISSION:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_403_FORBIDDEN, 'invalid token')
-        elif e.exception_type == ExceptionType.NOT_FOUND:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_404_NOT_FOUND, 'there is no user')
+        logging.error(e)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
     # check email duplicate
     email_check_query = select(User).where(User.email == user.email)
@@ -159,22 +149,12 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
     try:
         token = get_token_by_header(request)
         me = get_user_by_token(token, db)
+        check_authorized_by_user(me)
         validate_file_extension(file.filename)
         validate_file_format(file)
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.INCORRECT_FORMAT:
-            logging.error(e)
-            raise HTTPException(e.status_code, detail=e.message)
-        elif e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e)
-            raise HTTPException(e.status_code, e.message)
-    except GetException as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e)
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
-        elif e.exception_type == ExceptionType.NOT_FOUND:
-            logging.error(e)
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+        logging.error(e)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
     organization_id = me.organization_id
 
@@ -276,16 +256,8 @@ async def get_my_information(request: Request, db: Session = Depends(get_db)):
             }
         }
     except GetExceptionWithStatuscode as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(e.status_code, detail=e.message)
-    except GetException as e:
-        if e.exception_type == ExceptionType.INVALID_TOKEN:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'invalid token')
-        elif e.exception_type == ExceptionType.NOT_FOUND:
-            logging.error(e.message)
-            raise HTTPException(status.HTTP_404_NOT_FOUND, 'there is no user')
+        logging.error(e)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 def check_permission(me, user_id, db: Session = Depends(get_db)):
