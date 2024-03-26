@@ -11,6 +11,7 @@ from models import User
 
 router = APIRouter(prefix='/accounts')
 
+
 # TODO Deprecated api
 @router.get('')
 def get_my_account_info(request: Request, db: Session = Depends(get_db)):
