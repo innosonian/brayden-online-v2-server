@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import select, and_, update
 
+from apis.util import get_user_by_token, get_token_by_header
 from database import get_db
 from exceptions import GetExceptionWithStatuscode, ExceptionType
 from models.model import CertificationsTemplate, User
@@ -21,22 +22,6 @@ from pyhtml2pdf import converter
 router = APIRouter(prefix='/certifications_template')
 
 BUCKET_NAME = 'brayden-online-v2-api-storage'
-
-
-def check_authorization(request: Request, db: Session = Depends(get_db)):
-    headers = request.headers
-    if not headers.get('Authorization'):
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_403_FORBIDDEN,
-                                         exception_type=ExceptionType.NOT_FOUND,
-                                         message='Authorization')
-    token = headers.get('Authorization')
-    token_query = select(User).where(User.token == token)
-    user = db.scalar(token_query)
-    if not user:
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
-                                         exception_type=ExceptionType.INVALID_TOKEN,
-                                         message='invalid token')
-    return user
 
 
 def authorize_aws_s3():
@@ -83,15 +68,9 @@ def upload_file_and_get_presigned_url(upload_file):
 
 @router.get("/{manikin_type}", status_code=status.HTTP_200_OK, response_model=GetResponseSchema)
 async def get_certifications_template(request: Request, manikin_type: str, db: Session = Depends(get_db)):
-    token = request.headers['Authorization']
-    # check user from token
-    token_query = select(User).where(User.token == token)
-    user = db.scalar(token_query)
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
-
     try:
-        user = check_authorization(request, db)
+        token = get_token_by_header(request)
+        user = get_user_by_token(token, db)
         query = select(CertificationsTemplate).where(
             and_(User.organization_id == user.organization_id, CertificationsTemplate.manikin_type == manikin_type))
         certification = db.scalar(query)
@@ -115,19 +94,18 @@ async def update_certification_template(
         db: Session = Depends(get_db)):
     update_value = {}
     images_url = {}
+    try:
+        token = get_token_by_header(request)
+        user = get_user_by_token(token, db)
 
-    token = request.headers['Authorization']
-    # check user from token
-    token_query = select(User).where(User.token == token)
-    user = db.scalar(token_query)
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
-
-    title = request._form.get('title')
-    query = select(CertificationsTemplate).where(
-        and_(User.organization_id == user.organization_id, CertificationsTemplate.manikin_type == manikin_type))
-    certification = db.scalar(query)
-    file_names = certification.images
+        title = request._form.get('title')
+        query = select(CertificationsTemplate).where(
+            and_(User.organization_id == user.organization_id, CertificationsTemplate.manikin_type == manikin_type))
+        certification = db.scalar(query)
+        file_names = certification.images
+    except GetExceptionWithStatuscode as e:
+        logging.error(e)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
     if data.top_left and data.top_left.filename:
         image_url, update_filename = upload_file_and_get_presigned_url(data.top_left)
@@ -266,7 +244,8 @@ def convert_html_to_pdf():
     converter.convert(f'file:///{html_path}', file_name, print_options={"landscape": True})
     return file_name
 
-#TODO 발급 받은 인증서는 따로 빼야할거 같음
+
+# TODO 발급 받은 인증서는 따로 빼야할거 같음
 @router.get('/download/{user_id}')
 def get_issued_certificate(user_id: int, manikin_type: str = 'adult', db: Session = Depends(get_db)):
     try:
