@@ -200,18 +200,30 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
 
 
 @router.get('', status_code=status.HTTP_200_OK, response_model=GetListResponseSchema)
-async def get_users(page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
+async def get_users(request: Request, page: int = 1, search_keyword: str = None, db: Session = Depends(get_db)):
     # TODO 조직에 따라서 유저 정보 필터 필요
+    organization_id = None
+    try:
+        token = get_token_by_header(request)
+        me = get_user_by_token(token, db)
+        organization_id = me.organization_id
+    except GetExceptionWithStatuscode as e:
+        logging.error(e)
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
     def get_users_by_search_keyword(search_keyword):
         def all_users(offset: int = 0):
-            query = select(User).order_by(User.id.desc())
+            query = select(User).order_by(User.id.desc()).where(
+                and_(User.organization_id == organization_id, User.user_role_id == STUDENT))
             users = db.execute(query.offset(offset).fetch(per_page)).scalars().all()
             return users, query
 
         def filtered_users(search_keyword, offset: int = 0):
-            query = (select(User).where(or_(User.email.contains(search_keyword),
-                                            User.employee_id.contains(search_keyword),
-                                            User.name.contains(search_keyword))).order_by(User.id.desc()))
+            query = (select(User).where(and_(or_(User.email.contains(search_keyword),
+                                                 User.employee_id.contains(search_keyword),
+                                                 User.name.contains(search_keyword)),
+                                             User.organization_id == organization_id, User.user_role_id == STUDENT))
+                     .order_by(User.id.desc()))
             return db.scalars(query.fetch(per_page).offset(offset)).all(), query
 
         offset = (page - 1) * per_page

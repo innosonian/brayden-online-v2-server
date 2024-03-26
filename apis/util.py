@@ -22,7 +22,7 @@ def get_token_by_header(request: Request):
     return headers.get(AUTHORIZATION)
 
 
-def get_user_by_token(token: str, db: Session = Depends(get_db)):
+def get_user_by_token(token: str, db: Session = Depends(get_db)) -> User:
     if not token:
         raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
                                          exception_type=ExceptionType.INVALID_TOKEN,
