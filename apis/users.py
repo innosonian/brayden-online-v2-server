@@ -164,6 +164,12 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
     users = df.to_dict('records')
     success_count = users.__len__()
     try:
+        for user in users:
+            if 'user_role_id' not in user.keys():
+                user['user_role_id'] = STUDENT
+            if 'organization_id' not in user.keys():
+                user['organization_id'] = organization_id
+
         return_users = db.scalars(insert(User).returning(User), users)
         # return_users = return_users.all()
         db.commit()
