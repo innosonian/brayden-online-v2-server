@@ -13,7 +13,7 @@ from sqlalchemy import select
 from uuid import uuid1
 from datetime import datetime, timedelta
 
-from schema.authorization import RoleResponse, UserResponseSchema, LoginRequestSchema, BaseResponseSchema
+from schema.authorization import RoleResponse, UserResponseSchema, LoginRequestSchema
 
 router = APIRouter()
 
@@ -78,7 +78,7 @@ async def login(login_data: LoginRequestSchema, db: Session = Depends(get_db)):
 
 
 def check_admin_by_role(user):
-    if not user.user_role or user.user_role.role != 'administrator':
+    if not user.user_role or user.user_role.role != 'administrator' or user.user_role.role != 'instructor':
         raise GetExceptionWithStatuscode(status.HTTP_401_UNAUTHORIZED,
                                          'login fail',
                                          ExceptionType.INVALID_PERMISSION)

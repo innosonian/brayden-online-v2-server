@@ -2,13 +2,13 @@ import logging
 
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 
-from sqlalchemy import outerjoin
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import select, update
 
+from apis.util import get_token_by_header, get_user_by_token, check_authorized_by_user
 from database import get_db
 from exceptions import GetExceptionWithStatuscode, ExceptionType
-from models import TrainingProgram, User, CPRGuideline
+from models import TrainingProgram, CPRGuideline
 from models.model import TrainingProgramContent
 
 from schema.training_program import CreateRequestSchema, CreateResponseSchema, GetResponseSchema, UpdateRequestSchema, \
@@ -17,41 +17,13 @@ from schema.training_program import CreateRequestSchema, CreateResponseSchema, G
 router = APIRouter(prefix='/training-programs')
 
 
-def check_exist_token(request):
-    headers = request.headers
-    if 'Authorization' not in headers:
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
-                                         message='invalid token',
-                                         exception_type=ExceptionType.INVALID_TOKEN
-                                         )
-    return headers.get('Authorization')
-
-
-def get_authorized_user_by_token(token: str, db: Session = Depends(get_db)):
-    if not token:
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
-                                         exception_type=ExceptionType.INVALID_TOKEN,
-                                         message='invalid token')
-
-    select_query = select(User).where(User.token == token)
-    user = db.scalar(select_query)
-    if not user:
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_404_NOT_FOUND,
-                                         exception_type=ExceptionType.NOT_MATCHED,
-                                         message='there is no user')
-    elif user.user_role_id != 3:
-        raise GetExceptionWithStatuscode(status_code=status.HTTP_401_UNAUTHORIZED,
-                                         exception_type=ExceptionType.INVALID_PERMISSION,
-                                         message='no authorization')
-
-    return user
-
-
 @router.post('', response_model=CreateResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_training_program(request: Request, data: CreateRequestSchema, db: Session = Depends(get_db)):
     try:
-        token = check_exist_token(request)
-        user = get_authorized_user_by_token(token, db)
+        token = get_token_by_header(request)
+
+        user = get_user_by_token(token, db)
+        check_authorized_by_user(user)
     except GetExceptionWithStatuscode as e:
         if e.exception_type == ExceptionType.INVALID_PERMISSION:
             raise HTTPException(e.status_code, e.message)
@@ -121,8 +93,9 @@ def check_exist_training_program(id: int, db: Session = Depends(get_db)):
 async def update_training_program(request: Request, training_program_id: int, data: UpdateRequestSchema,
                                   db: Session = Depends(get_db)):
     try:
-        token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        token = get_token_by_header(request)
+        user = get_user_by_token(token, db)
+        check_authorized_by_user(user)
 
         training_program = check_exist_training_program(training_program_id, db)
         training_data = dict()
@@ -173,8 +146,9 @@ async def update_training_program(request: Request, training_program_id: int, da
 @router.delete('/{training_program_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_program(request: Request, training_program_id: int, db: Session = Depends(get_db)):
     try:
-        token = check_exist_token(request)
-        get_authorized_user_by_token(token, db)
+        token = get_token_by_header(request)
+        user = get_user_by_token(token, db)
+        check_authorized_by_user(user)
 
         training_program = check_exist_training_program(training_program_id, db)
         db.delete(training_program)
