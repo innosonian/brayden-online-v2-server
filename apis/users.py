@@ -169,6 +169,9 @@ async def user_upload(request: Request, file: UploadFile, db: Session = Depends(
                 user['user_role_id'] = STUDENT
             if 'organization_id' not in user.keys():
                 user['organization_id'] = organization_id
+            if 'password' in user.keys():
+                password_hashed = hashed_data(user['password']).decode('utf-8')
+                user['password_hashed'] = password_hashed
 
         return_users = db.scalars(insert(User).returning(User), users)
         # return_users = return_users.all()
